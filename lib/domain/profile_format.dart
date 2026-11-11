@@ -1,25 +1,60 @@
 // Plain text formatting for profile screens. No Flutter here.
 
-const _months = [
+const monthNames = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-/// "Mar 14" for '--03-14' (year unknown) or '1990-03-14'; null if invalid.
-String? birthdayLabel(String? b) {
+/// A birthday as stored: "--MM-DD" when the year is unknown, else "YYYY-MM-DD".
+typedef Birthday = ({int month, int day, int? year});
+
+int daysInMonth(int month, {int? year}) {
+  if (month == 2) {
+    // Without a year, allow Feb 29 (someone born on a leap day).
+    if (year == null) return 29;
+    final leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    return leap ? 29 : 28;
+  }
+  return const [4, 6, 9, 11].contains(month) ? 30 : 31;
+}
+
+/// Parses a stored birthday; null if it is missing or not a real date.
+Birthday? parseBirthday(String? b) {
   if (b == null) return null;
-  final m = RegExp(r'^(?:\d{4}|-)-(\d{2})-(\d{2})$').firstMatch(b);
+  final m = RegExp(r'^(?:(\d{4})|-)-(\d{2})-(\d{2})$').firstMatch(b);
   if (m == null) return null;
-  final month = int.parse(m.group(1)!);
-  final day = int.parse(m.group(2)!);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  return '${_months[month - 1]} $day';
+  final year = m.group(1) == null ? null : int.parse(m.group(1)!);
+  final month = int.parse(m.group(2)!);
+  final day = int.parse(m.group(3)!);
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(month, year: year)) {
+    return null;
+  }
+  return (month: month, day: day, year: year);
+}
+
+/// The stored form, or null if the date does not exist.
+String? formatBirthday(int month, int day, {int? year}) {
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(month, year: year)) {
+    return null;
+  }
+  if (year != null && (year < 1900 || year > 2100)) return null;
+  final mm = month.toString().padLeft(2, '0');
+  final dd = day.toString().padLeft(2, '0');
+  return year == null ? '--$mm-$dd' : '${year.toString().padLeft(4, '0')}-$mm-$dd';
+}
+
+/// "Mar 14", or "Mar 14, 1990" when the year is known; null if invalid.
+String? birthdayLabel(String? b) {
+  final p = parseBirthday(b);
+  if (p == null) return null;
+  final base = '${monthNames[p.month - 1]} ${p.day}';
+  return p.year == null ? base : '$base, ${p.year}';
 }
 
 /// "Sep 21", or "Sep 21, 2025" when the year differs from [now]'s.
 String shortDate(DateTime d, DateTime now) {
   final l = d.toLocal();
-  final base = '${_months[l.month - 1]} ${l.day}';
+  final base = '${monthNames[l.month - 1]} ${l.day}';
   return l.year == now.toLocal().year ? base : '$base, ${l.year}';
 }
 

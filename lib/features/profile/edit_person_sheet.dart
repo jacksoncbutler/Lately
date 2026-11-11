@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../domain/profile_format.dart';
+import '../../ui/birthday_picker.dart';
 import '../../ui/city_picker.dart';
 
 enum EditOutcome { saved, archived, restored, deleted }
@@ -62,17 +63,8 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
   }
 
   Future<void> _pickBirthday() async {
-    final d = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2000, 1, 1),
-      firstDate: DateTime(2000, 1, 1),
-      lastDate: DateTime(2000, 12, 31),
-      helpText: 'Birthday (month and day)',
-    );
-    if (d != null) {
-      setState(() => _birthday =
-          '--${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}');
-    }
+    final r = await showBirthdayPicker(context, initial: _birthday);
+    if (r != null) setState(() => _birthday = r.value);
   }
 
   Future<void> _save() async {

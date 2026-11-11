@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../domain/profile_format.dart';
+import '../../ui/birthday_picker.dart';
 import '../../ui/block_tile.dart';
 import '../../ui/swipe_line.dart';
 
@@ -79,18 +80,8 @@ class _RelationshipSheetState extends ConsumerState<RelationshipSheet> {
   }
 
   Future<void> _pickBirthday() async {
-    // Year 2000 is a placeholder: only month and day are kept.
-    final d = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2000, 1, 1),
-      firstDate: DateTime(2000, 1, 1),
-      lastDate: DateTime(2000, 12, 31),
-      helpText: 'Birthday (month and day)',
-    );
-    if (d != null) {
-      setState(() => _birthday =
-          '--${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}');
-    }
+    final r = await showBirthdayPicker(context, initial: _birthday);
+    if (r != null) setState(() => _birthday = r.value);
   }
 
   Future<void> _save() async {

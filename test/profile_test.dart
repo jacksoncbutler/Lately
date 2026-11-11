@@ -99,6 +99,25 @@ void main() {
     await settle(tester);
   }
 
+  Future<void> pickBirthday(WidgetTester tester, String month, String day, {String? year, bool open = true}) async {
+    if (open) {
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const Key('bday-month')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(month).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bday-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(day).last);
+    await tester.pumpAndSettle();
+    if (year != null) await tester.enterText(find.byKey(const Key('bday-year')), year);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save').last);
+    await tester.pumpAndSettle();
+  }
+
   Future<void> typeAndEnter(WidgetTester tester, Finder f, String text) async {
     await tester.enterText(f, text);
     await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -463,11 +482,7 @@ void main() {
       await tester.enterText(find.byKey(const Key('edit-hometown')), 'Porto');
       await tester.enterText(find.byKey(const Key('edit-socials')), '@sam.r');
       await tester.tap(find.text('Call'));
-      await tester.tap(find.byKey(const Key('edit-birthday')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('14'));
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
+      await pickBirthday(tester, 'Jan', '14');
       await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
       await settle(tester);
 
@@ -548,6 +563,134 @@ void main() {
       expect(await repo.getPerson(sam), isNull);
       expect(await repo.linesFor(sam), isEmpty);
       expect(await repo.relationshipsFor(sam), isEmpty);
+    });
+  });
+
+  group('Birthday picker', () {
+    Future<void> openEdit(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('profile-edit')));
+      await settle(tester);
+    }
+
+    Future<String?> saved() async => (await repo.getPerson(sam))!.birthday;
+
+    testApp('month and day from lists; the year is optional, so it is not locked to 2000', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await pickBirthday(tester, 'Mar', '14');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '--03-14');
+      expect(find.text('Mar 14'), findsOneWidget);
+    });
+
+    testApp('a typed year is plain digits with no slashes', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await pickBirthday(tester, 'Mar', '14', year: '1990');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '1990-03-14');
+      expect(find.text('Mar 14, 1990'), findsOneWidget);
+    });
+
+    testApp('only digits are accepted in the year', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('bday-year')), '19/9x0');
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('bday-year'))).controller!.text, '1990');
+    });
+
+    testApp('Save needs month and day; a bad year is explained', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      final save = find.widgetWithText(FilledButton, 'Save').last;
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+      await tester.tap(find.byKey(const Key('bday-month')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('May').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bday-day')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('5').last);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+      await tester.enterText(find.byKey(const Key('bday-year')), '19');
+      await tester.pumpAndSettle();
+      expect(find.text('Use a 4-digit year, or leave it blank'), findsOneWidget);
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+    });
+
+    testApp('days follow the month, and Feb 29 needs a leap year', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bday-month')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Feb').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bday-day')));
+      await tester.pumpAndSettle();
+      expect(find.text('29').last, findsOneWidget);
+      expect(find.text('30'), findsNothing); // no Feb 30
+      await tester.tap(find.text('29').last);
+      await tester.pumpAndSettle();
+      final save = find.widgetWithText(FilledButton, 'Save').last;
+      expect(tester.widget<FilledButton>(save).onPressed, isNotNull); // year unknown: allowed
+      // 2023 is not a leap year, so the day moves to Feb 28.
+      await tester.enterText(find.byKey(const Key('bday-year')), '2023');
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '2023-02-28');
+    });
+
+    testApp('Cancel keeps the old birthday; Clear removes it', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(birthday: Value('1990-09-27')));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      // The dialog starts from the saved date.
+      expect(find.text('Sep'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('bday-year'))).controller!.text, '1990');
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '1990-09-27');
+
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), isNull);
+      expect(find.text('Not added'), findsWidgets);
+    });
+
+    testApp('Their people cards use the same picker', (tester) async {
+      final rid = await repo.createRelationship(personId: sam, name: 'Rosa');
+      await openProfile(tester);
+      await tester.tap(find.text('Rosa'));
+      await settle(tester);
+      await tester.tap(find.text('Add birthday'));
+      await tester.pumpAndSettle();
+      await pickBirthday(tester, 'Oct', '3', year: '2014', open: false);
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await settle(tester);
+      expect((await repo.relationshipsFor(sam)).firstWhere((r) => r.id == rid).birthday, '2014-10-03');
     });
   });
 
