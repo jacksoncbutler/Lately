@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/device_sources.dart';
 import '../../data/providers.dart';
-import '../../domain/constants.dart';
 
 String _digits(String? s) => (s ?? '').replaceAll(RegExp(r'\D'), '');
 
@@ -23,7 +22,6 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
   Set<String> _existingNames = {};
   final _picked = <String>{};
   String? _groupId;
-  int? _lastTalkedDays;
   String _query = '';
   bool _busy = false;
   bool _loading = true;
@@ -67,15 +65,14 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
     setState(() => _busy = true);
     final repo = ref.read(repositoryProvider);
     final zone = await ref.read(deviceTimezoneProvider).current();
-    final now = ref.read(nowProvider)();
-    final days = _lastTalkedDays ?? Tune.defaultLastTalkedDays;
     final chosen = _contacts.where((c) => _picked.contains(c.id)).toList();
     await repo.createPeople(
       [for (final c in chosen) (displayName: c.name, phone: c.phone)],
       groupId: _groupId!,
       timezone: zone,
       timezoneConfirmed: false,
-      lastTalkedEstimate: now.subtract(Duration(days: days)),
+      // Where they are and when you last talked are set per person later
+      // ("Finish setup"), because they differ for everyone.
     );
     ref.invalidate(peopleProvider);
     if (mounted) Navigator.of(context).pop(chosen.length);
@@ -135,7 +132,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Group for everyone you pick', style: Theme.of(context).textTheme.labelLarge),
+            Text('Group for everyone you pick (you will finish each person after)', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 4),
             Wrap(spacing: 8, children: [
               for (final g in groups)
@@ -143,19 +140,6 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
                   label: Text('${g.name} · ${g.defaultIntervalDays}d'),
                   selected: _groupId == g.id,
                   onSelected: (_) => setState(() => _groupId = g.id),
-                ),
-            ]),
-            const SizedBox(height: 12),
-            Text('Roughly when did you last talk?',
-                style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 4),
-            Wrap(spacing: 8, children: [
-              for (final c in Tune.lastTalkedChoices)
-                ChoiceChip(
-                  label: Text(c.$1),
-                  selected: _lastTalkedDays == c.$2,
-                  onSelected: (_) =>
-                      setState(() => _lastTalkedDays = _lastTalkedDays == c.$2 ? null : c.$2),
                 ),
             ]),
             const SizedBox(height: 12),

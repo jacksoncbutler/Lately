@@ -20,3 +20,12 @@ Temporary identity (name, icon, package id `net.butler.lately`) is in `lib/app_c
 - `lib/data/device_sources.dart` holds the two platform inputs (phone contacts, device timezone) behind interfaces. READ_CONTACTS is declared in the manifest but only requested when a bulk add starts.
 - First-run setup completion is device-local (`settings.setupCompletedAt`, not exported). Importing a backup marks setup done.
 - Until profiles (step 5) and People (step 8) exist, `people_screen.dart` is a minimal list; tapping a person only sets their timezone.
+
+## Step 5 notes
+
+- `lib/ui/swipe_line.dart` and `lib/ui/block_tile.dart` hold the interaction rules once (tap to edit, swipe left to delete with an Undo bar, trash while editing, Next time checkbox, ruled blank rows, See all). Every screen that shows lines uses them; do not re-implement.
+- `lib/ui/theme.dart` carries the prototype's colours (light and dark). The prototype's web fonts are not bundled (no network access); the system font is used until fonts are bundled as assets.
+- Profile screens live in `lib/features/profile/`: header and facts, blocks, Their people cards, Edit person (with Manage: archive, restore, delete forever), Reach (Contact), Finish setup.
+- Bulk-added people are "unfinished" (`needsFinishing`: timezone not confirmed) until you confirm where they are and roughly when you last talked, per person.
+- Widget tests that use drift streams must use the `testApp` helper pattern (unmount and close the database inside the test) or drift's stream timers fail the test.
+- Chat detail and the Log button arrive in step 6; Recent chats is read-only until then.

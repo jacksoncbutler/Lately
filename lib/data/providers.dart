@@ -6,6 +6,7 @@ import 'backup/backup_service.dart';
 import 'backup_platform.dart';
 import 'database.dart';
 import 'device_sources.dart';
+import 'phone_launcher.dart';
 import 'repository.dart';
 
 /// Set in main() after the database has been opened safely (see safe_open.dart).
@@ -43,8 +44,33 @@ final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 final setupCompleteProvider = FutureProvider<bool>(
     (ref) => ref.watch(repositoryProvider).isSetupComplete());
 
-final peopleProvider = FutureProvider<List<PersonRow>>(
-    (ref) => ref.watch(repositoryProvider).listPeople());
+final phoneLauncherProvider =
+    Provider<PhoneLauncher>((ref) => DevicePhoneLauncher());
 
-final groupsProvider = FutureProvider<List<GroupRow>>(
-    (ref) => ref.watch(repositoryProvider).listGroups());
+final peopleProvider = StreamProvider<List<PersonRow>>(
+    (ref) => ref.watch(repositoryProvider).watchPeople());
+
+final archivedPeopleProvider = StreamProvider<List<PersonRow>>(
+    (ref) => ref.watch(repositoryProvider).watchArchivedPeople());
+
+final groupsProvider = StreamProvider<List<GroupRow>>(
+    (ref) => ref.watch(repositoryProvider).watchGroups());
+
+final personProvider = StreamProvider.family<PersonRow?, String>(
+    (ref, id) => ref.watch(repositoryProvider).watchPerson(id));
+
+final linesProvider = StreamProvider.family<List<LineRow>, String>(
+    (ref, id) => ref.watch(repositoryProvider).watchLines(id));
+
+final relationshipsProvider =
+    StreamProvider.family<List<RelationshipRow>, String>(
+        (ref, id) => ref.watch(repositoryProvider).watchRelationships(id));
+
+final chatsProvider = StreamProvider.family<List<ChatRow>, String>(
+    (ref, id) => ref.watch(repositoryProvider).watchChats(id));
+
+final customBlocksProvider = StreamProvider<List<CustomBlockRow>>(
+    (ref) => ref.watch(repositoryProvider).watchCustomBlocks());
+
+final settingsProvider = StreamProvider<AppSettings>(
+    (ref) => ref.watch(repositoryProvider).watchSettings());

@@ -57,10 +57,19 @@ void main() {
     tmp = Directory.systemTemp.createTempSync('lately_flow_test');
     contacts = FakeContacts(ContactsAccess.granted);
   });
-  tearDown(() async {
-    await db.close();
-    tmp.deleteSync(recursive: true);
-  });
+  tearDown(() => tmp.deleteSync(recursive: true));
+
+  /// Like testWidgets, then unmounts the app and closes the database in a way
+  /// that does not leave drift's stream timers pending.
+  void testApp(String name, Future<void> Function(WidgetTester tester) body) {
+    testWidgets(name, (tester) async {
+      await body(tester);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.runAsync(db.close);
+    });
+  }
+
 
   Future<void> settle(WidgetTester tester) async {
     for (var i = 0; i < 4; i++) {
@@ -88,7 +97,7 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('first run shows setup; Continue saves group intervals and block order', (tester) async {
+  testApp('first run shows setup; Continue saves group intervals and block order', (tester) async {
     await pumpApp(tester);
     expect(find.text('Welcome to Lately'), findsOneWidget);
     expect(find.text('every 14 days'), findsOneWidget); // Parents
@@ -113,7 +122,7 @@ void main() {
     expect(find.text('Who would you like to stay close to?'), findsOneWidget);
   });
 
-  testWidgets('setup can add a custom group', (tester) async {
+  testApp('setup can add a custom group', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.text('Add a group'));
     await tester.pumpAndSettle();
@@ -127,7 +136,7 @@ void main() {
   group('after setup', () {
     setUp(() async => repo.completeSetup());
 
-    testWidgets('add a person: needs name and city; shows local time there; seeds last talked', (tester) async {
+    testApp('add a person: needs name and city; shows local time there; seeds last talked', (tester) async {
       await pumpApp(tester);
       await tester.tap(find.text('Add someone'));
       await tester.pumpAndSettle();
@@ -160,7 +169,7 @@ void main() {
       expect((await repo.getGroup(sam.groupId))!.name, 'Friends'); // default group
     });
 
-    testWidgets('unanswered last-talked defaults to about six months', (tester) async {
+    testApp('unanswered last-talked defaults to about six months', (tester) async {
       await pumpApp(tester);
       await tester.tap(find.text('Add someone'));
       await tester.pumpAndSettle();
@@ -176,7 +185,7 @@ void main() {
       expect(jun.lastTalkedEstimate!.toUtc(), fixedNow.subtract(const Duration(days: 180)));
     });
 
-    testWidgets('create and add more keeps the group and clears the form', (tester) async {
+    testApp('create and add more keeps the group and clears the form', (tester) async {
       await pumpApp(tester);
       await tester.tap(find.text('Add someone'));
       await tester.pumpAndSettle();
@@ -194,7 +203,7 @@ void main() {
       expect(tester.widget<TextField>(find.widgetWithText(TextField, 'First name')).controller!.text, '');
     });
 
-    testWidgets('people list shows each person with the right local time', (tester) async {
+    testApp('people list shows each person with the right local time', (tester) async {
       final g = (await repo.listGroups()).first.id;
       await repo.createPerson(displayName: 'Sam', groupId: g, timezone: 'Europe/Lisbon', contactMethodType: 'text', timezoneConfirmed: true);
       await repo.createPerson(displayName: 'Noor', groupId: g, timezone: 'Asia/Dubai', contactMethodType: 'text', timezoneConfirmed: true);
@@ -207,7 +216,7 @@ void main() {
       expect(find.textContaining('Auckland · 3:10 am there'), findsOneWidget);
     });
 
-    testWidgets('bulk add: pick contacts, one group for all, unconfirmed device timezone', (tester) async {
+    testApp('bulk add: pick contacts, one group for all, then finish each person separately', (tester) async {
       contacts = FakeContacts(ContactsAccess.granted, const [
         PhoneContact(id: '1', name: 'Alex', phone: '+61 555 0103'),
         PhoneContact(id: '2', name: 'Priya', phone: '+91 555 0121'),
@@ -239,28 +248,59 @@ void main() {
         expect(p.timezone, 'America/Chicago'); // this phone's
         expect(p.timezoneConfirmed, isFalse);
         expect((await repo.getGroup(p.groupId))!.name, 'Siblings');
-        expect(p.lastTalkedEstimate!.toUtc(), fixedNow.subtract(const Duration(days: 180)));
+        expect(p.lastTalkedEstimate, isNull); // set per person, not for the batch
       }
       expect(batch.firstWhere((p) => p.displayName == 'Alex').phone, '+61 555 0103');
       expect(batch.firstWhere((p) => p.displayName == 'Marcus').phone, isNull);
 
-      // They show a Set timezone prompt, and tapping lets you fix it.
-      expect(find.text('Set timezone'), findsNWidgets(3));
+      // The batch screen has no shared "last talked" question.
+      // Each one shows Finish setup; finishing asks for city and last talked.
+      expect(find.text('Finish setup'), findsNWidgets(3));
       await tester.tap(find.text('Alex'));
       await settle(tester);
+      expect(find.text('Finish setup for Alex'), findsOneWidget);
+      final finish = find.widgetWithText(FilledButton, 'Finish setup');
+      expect(tester.widget<FilledButton>(finish).onPressed, isNull);
       await tester.enterText(find.byType(TextField), 'sydney');
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('Sydney'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
+      expect(tester.widget<FilledButton>(finish).onPressed, isNull); // still needs last talked
+      await tester.tap(find.text('A month'));
+      await tester.pumpAndSettle();
+      await tester.tap(finish);
       await settle(tester);
+
       final alex = (await repo.listPeople()).firstWhere((p) => p.displayName == 'Alex');
       expect(alex.timezone, 'Australia/Sydney');
       expect(alex.timezoneConfirmed, isTrue);
-      expect(find.text('Set timezone'), findsNWidgets(2));
+      expect(alex.lastTalkedEstimate!.toUtc(), fixedNow.subtract(const Duration(days: 30)));
+      // Finishing opens the profile.
+      expect(find.byKey(const Key('profile-contact')), findsOneWidget);
     });
 
-    testWidgets('bulk add: permission is only asked when it starts, and denial is explained', (tester) async {
+    testApp('finish setup: "Not sure" uses the six-month default', (tester) async {
+      final g = (await repo.listGroups()).first.id;
+      await repo.createPeople([(displayName: 'Jo', phone: null)],
+          groupId: g, timezone: 'America/Chicago', timezoneConfirmed: false);
+      await pumpApp(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'People'));
+      await settle(tester);
+      await tester.tap(find.text('Jo'));
+      await settle(tester);
+      await tester.tap(find.text('Same as mine (Chicago)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Not sure'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Finish setup'));
+      await settle(tester);
+      final jo = (await repo.listPeople()).single;
+      expect(jo.timezone, 'America/Chicago');
+      expect(jo.timezoneConfirmed, isTrue);
+      expect(jo.lastTalkedEstimate!.toUtc(), fixedNow.subtract(const Duration(days: 180)));
+    });
+
+    testApp('bulk add: permission is only asked when it starts, and denial is explained', (tester) async {
       contacts = FakeContacts(ContactsAccess.denied);
       await pumpApp(tester);
       expect(contacts.requested, 0); // nothing asked on launch or on Home
@@ -271,7 +311,7 @@ void main() {
       expect(find.text('Try again'), findsOneWidget);
     });
 
-    testWidgets('bulk add: permanently denied points to phone settings and adding one at a time', (tester) async {
+    testApp('bulk add: permanently denied points to phone settings and adding one at a time', (tester) async {
       contacts = FakeContacts(ContactsAccess.permanentlyDenied);
       await pumpApp(tester);
       await tester.tap(find.text('Add from contacts'));

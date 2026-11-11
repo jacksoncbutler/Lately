@@ -11,6 +11,7 @@ import 'data/providers.dart';
 import 'data/safe_open.dart';
 import 'domain/timezones.dart';
 import 'features/home/home_screen.dart';
+import 'ui/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,11 +40,6 @@ Future<void> main() async {
   }
 }
 
-ThemeData latelyTheme() => ThemeData(
-      colorSchemeSeed: const Color(0xFF1F8A8A),
-      useMaterial3: true,
-    );
-
 class LatelyApp extends StatelessWidget {
   const LatelyApp({super.key});
 
@@ -52,7 +48,8 @@ class LatelyApp extends StatelessWidget {
     return MaterialApp(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
-      theme: latelyTheme(),
+      theme: latelyThemeFor(Brightness.light),
+      darkTheme: latelyThemeFor(Brightness.dark),
       home: const HomeScreen(),
     );
   }
@@ -65,7 +62,8 @@ class _OpenFailedApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      theme: latelyTheme(),
+      theme: latelyThemeFor(Brightness.light),
+      darkTheme: latelyThemeFor(Brightness.dark),
       home: Scaffold(
         body: Padding(
           padding: const EdgeInsets.all(24),

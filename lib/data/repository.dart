@@ -248,9 +248,11 @@ class Repository {
       required String text,
       String? relationshipId,
       String? addedInChatId,
-      int sortOrder = 0}) async {
+      int? sortOrder}) async {
     final id = newId();
     final t = _now;
+    // Later lines sort after earlier ones even when added in the same second.
+    final order = sortOrder ?? await _nextLineOrder(personId, block);
     await db.into(db.lines).insert(LinesCompanion.insert(
         id: id,
         createdAt: t,
@@ -260,8 +262,17 @@ class Repository {
         lineText: text,
         relationshipId: Value(relationshipId),
         addedInChatId: Value(addedInChatId),
-        sortOrder: Value(sortOrder)));
+        sortOrder: Value(order)));
     return id;
+  }
+
+  Future<int> _nextLineOrder(String personId, String block) async {
+    final max = db.lines.sortOrder.max();
+    final row = await (db.selectOnly(db.lines)
+          ..addColumns([max])
+          ..where(db.lines.personId.equals(personId) & db.lines.block.equals(block)))
+        .getSingle();
+    return (row.read(max) ?? 0) + 1;
   }
 
   Future<List<LineRow>> linesFor(String personId, {String? block}) =>
@@ -383,4 +394,92 @@ class Repository {
 
   Future<void> deleteCustomBlock(String id) =>
       updateCustomBlock(id, CustomBlocksCompanion(deletedAt: Value(_now)));
+
+  // ---- Streams for screens (re-run when the data changes) ----
+  Stream<PersonRow?> watchPerson(String id) => (db.select(db.people)
+        ..where((t) => t.id.equals(id) & t.deletedAt.isNull()))
+      .watchSingleOrNull();
+
+  Stream<List<PersonRow>> watchPeople() => (db.select(db.people)
+        ..where((t) => t.deletedAt.isNull() & t.archivedAt.isNull())
+        ..orderBy([(t) => OrderingTerm.asc(t.displayName)]))
+      .watch();
+
+  Stream<List<PersonRow>> watchArchivedPeople() => (db.select(db.people)
+        ..where((t) => t.deletedAt.isNull() & t.archivedAt.isNotNull())
+        ..orderBy([(t) => OrderingTerm.asc(t.displayName)]))
+      .watch();
+
+  Stream<List<GroupRow>> watchGroups() => (db.select(db.groups)
+        ..where((t) => t.deletedAt.isNull())
+        ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+      .watch();
+
+  Stream<List<LineRow>> watchLines(String personId) => (db.select(db.lines)
+        ..where((t) => t.personId.equals(personId) & t.deletedAt.isNull())
+        ..orderBy([
+          (t) => OrderingTerm.asc(t.sortOrder),
+          (t) => OrderingTerm.asc(t.createdAt)
+        ]))
+      .watch();
+
+  Stream<List<RelationshipRow>> watchRelationships(String personId) =>
+      (db.select(db.relationships)
+            ..where((t) => t.personId.equals(personId) & t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          .watch();
+
+  Stream<List<ChatRow>> watchChats(String personId) => (db.select(db.chats)
+        ..where((t) => t.personId.equals(personId) & t.deletedAt.isNull())
+        ..orderBy([(t) => OrderingTerm.desc(t.occurredAt)]))
+      .watch();
+
+  Stream<List<CustomBlockRow>> watchCustomBlocks() =>
+      (db.select(db.customBlocks)
+            ..where((t) => t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+          .watch();
+
+  Stream<AppSettings> watchSettings() =>
+      (db.select(db.settings)..where((t) => t.id.equals(settingsId))).watchSingle();
+
+  Future<void> undeleteRelationship(String id) =>
+      updateRelationship(id, const RelationshipsCompanion(deletedAt: Value(null)));
+
+  /// A custom profile section. The key is derived from the name and kept
+  /// unique, and every key starts with c_ so it cannot clash with built-ins.
+  Future<String> addCustomSection(String name) async {
+    final existing = {for (final b in await listCustomBlocks()) b.key};
+    final slug = name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    var key = 'c_${slug.isEmpty ? 'section' : slug}';
+    var n = 2;
+    while (existing.contains(key)) {
+      key = 'c_${slug.isEmpty ? 'section' : slug}_${n++}';
+    }
+    return createCustomBlock(key, name.trim(), sortOrder: existing.length);
+  }
+
+  /// Remembers who you just tapped Contact for (the Home prompt and the log
+  /// popup default use it for a few hours).
+  Future<void> setRecentContact(String personId) => updateSettings(
+      SettingsCompanion(
+          recentContactPersonId: Value(personId), recentContactAt: Value(_now)));
+
+  /// Completes a bulk-added person: where they are and roughly when you last
+  /// talked. [lastTalked] null leaves the estimate as it is.
+  Future<void> finishSetup(String id,
+      {required String timezone, required DateTime lastTalked}) =>
+      updatePerson(
+          id,
+          PeopleCompanion(
+              timezone: Value(timezone),
+              timezoneConfirmed: const Value(true),
+              lastTalkedEstimate: Value(lastTalked.toUtc())));
 }
+
+/// Bulk-added people stay "unfinished" until you confirm where they are and
+/// roughly when you last talked.
+bool needsFinishing(PersonRow p) => !p.timezoneConfirmed;

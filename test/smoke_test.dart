@@ -33,10 +33,19 @@ void main() {
     tmp = Directory.systemTemp.createTempSync('lately_ui_test');
     platform = FakePlatform(Directory('${tmp.path}/out'));
   });
-  tearDown(() async {
-    await db.close();
-    tmp.deleteSync(recursive: true);
-  });
+  tearDown(() => tmp.deleteSync(recursive: true));
+
+  /// Like testWidgets, then unmounts the app and closes the database in a way
+  /// that does not leave drift's stream timers pending.
+  void testApp(String name, Future<void> Function(WidgetTester tester) body) {
+    testWidgets(name, (tester) async {
+      await body(tester);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.runAsync(db.close);
+    });
+  }
+
 
   Future<void> pumpApp(WidgetTester tester) async {
     await Repository(db).completeSetup();
@@ -54,13 +63,13 @@ void main() {
     }
   }
 
-  testWidgets('an empty app invites you to add someone', (tester) async {
+  testApp('an empty app invites you to add someone', (tester) async {
     await pumpApp(tester);
     expect(find.text('Add someone'), findsOneWidget);
     expect(find.text('Add from contacts'), findsOneWidget);
   });
 
-  testWidgets('settings has Export and Import backup', (tester) async {
+  testApp('settings has Export and Import backup', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
@@ -69,7 +78,7 @@ void main() {
     expect(find.text('Not exported yet.'), findsOneWidget);
   });
 
-  testWidgets('export shows a warning, writes the file and opens the share sheet', (tester) async {
+  testApp('export shows a warning, writes the file and opens the share sheet', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
@@ -88,7 +97,7 @@ void main() {
     expect(find.textContaining('Last export:'), findsOneWidget);
   });
 
-  testWidgets('importing a file that is not a backup says so and changes nothing', (tester) async {
+  testApp('importing a file that is not a backup says so and changes nothing', (tester) async {
     platform.picked = 'not a backup';
     await pumpApp(tester);
     await tester.tap(find.byIcon(Icons.settings_outlined));

@@ -1,7 +1,7 @@
 name: lately
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.4.0+4
+version: 0.5.0+5
 
 environment:
   sdk: ^3.13.7
@@ -21,6 +21,7 @@ dependencies:
   share_plus: ^13.3.1
   sqlite3: ^3.9.1
   timezone: ^0.11.2
+  url_launcher: ^6.3.3
   uuid: ^4.6.0
 
 dev_dependencies:
