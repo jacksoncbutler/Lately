@@ -15,4 +15,5 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - name: Reference logic tests
-        run: node reference/test.js
+        working-directory: reference
+        run: node test.js
