@@ -12,8 +12,12 @@ import '../../ui/swipe_line.dart';
 /// Result of closing the card: [deleted] is set when the person was removed
 /// from Their people (so the caller can show the Undo bar).
 class RelationshipResult {
-  const RelationshipResult({this.deletedId});
+  const RelationshipResult({this.deletedId, this.createdId});
   final String? deletedId;
+
+  /// Set when a new person was added to Their people (the log popup stamps
+  /// it with the chat it was added in).
+  final String? createdId;
 }
 
 /// Adds or edits a tile in Their people. Pass [relationshipId] to edit.
@@ -88,6 +92,7 @@ class _RelationshipSheetState extends ConsumerState<RelationshipSheet> {
     final repo = ref.read(repositoryProvider);
     final name = _name.text.trim();
     final rel = _relation.text.trim();
+    String? createdId;
     if (_id == null) {
       final id = await repo.createRelationship(
         personId: widget.personId,
@@ -99,6 +104,7 @@ class _RelationshipSheetState extends ConsumerState<RelationshipSheet> {
         await repo.createLine(
             personId: widget.personId, block: 'family', text: n.text, relationshipId: id);
       }
+      createdId = id;
     } else {
       await repo.updateRelationship(
           _id!,
@@ -108,7 +114,7 @@ class _RelationshipSheetState extends ConsumerState<RelationshipSheet> {
             birthday: Value(_birthday),
           ));
     }
-    if (mounted) Navigator.pop(context, const RelationshipResult());
+    if (mounted) Navigator.pop(context, RelationshipResult(createdId: createdId));
   }
 
   @override

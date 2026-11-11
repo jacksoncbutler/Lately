@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../domain/chat_rules.dart';
 import 'database.dart';
 
 /// Create, read, update, archive and soft-delete for every entity. Storage
@@ -394,6 +395,69 @@ class Repository {
 
   Future<void> deleteCustomBlock(String id) =>
       updateCustomBlock(id, CustomBlocksCompanion(deletedAt: Value(_now)));
+
+  /// Saves a logged conversation and everything tied to it in one step:
+  /// the chat, the Next time items it covered (linked to it), lines and
+  /// people added from the popup (stamped with it), and the person's clock
+  /// (snooze and skip are cleared; the recent-contact prompt is cleared).
+  Future<String> logChat({
+    required String personId,
+    required DateTime occurredAt,
+    bool timeApproximate = false,
+    required String type,
+    required String depth,
+    required int durationMinutes,
+    List<String> feelings = const [],
+    String? note,
+    List<String> coveredLineIds = const [],
+    List<String> addedLineIds = const [],
+    List<String> addedRelationshipIds = const [],
+  }) {
+    return db.transaction(() async {
+      final chatId = await createChat(
+        personId: personId,
+        occurredAt: occurredAt,
+        timeApproximate: timeApproximate,
+        type: type,
+        depth: depth,
+        length: lengthForMinutes(durationMinutes),
+        durationMinutes: durationMinutes,
+        feelings: [for (final f in feelings) f.toLowerCase()],
+        note: (note == null || note.trim().isEmpty) ? null : note.trim(),
+      );
+      for (final id in coveredLineIds) {
+        await updateLine(id, LinesCompanion(chatId: Value(chatId)));
+      }
+      for (final id in addedLineIds) {
+        await updateLine(id, LinesCompanion(addedInChatId: Value(chatId)));
+      }
+      for (final id in addedRelationshipIds) {
+        await updateRelationship(id, RelationshipsCompanion(addedInChatId: Value(chatId)));
+      }
+      await updatePerson(
+          personId,
+          const PeopleCompanion(snoozedUntil: Value(null), skippedUntil: Value(null)));
+      final s = await getSettings();
+      if (s.recentContactPersonId == personId) {
+        await updateSettings(const SettingsCompanion(
+            recentContactPersonId: Value(null), recentContactAt: Value(null)));
+      }
+      return chatId;
+    });
+  }
+
+  /// Last contact for every active person: newest chat, else the estimate.
+  Future<Map<String, DateTime?>> lastContactByPerson() async {
+    final people = await listPeople();
+    final chats = await db.select(db.chats).get();
+    final newest = <String, DateTime>{};
+    for (final c in chats) {
+      if (c.deletedAt != null) continue;
+      final cur = newest[c.personId];
+      if (cur == null || c.occurredAt.isAfter(cur)) newest[c.personId] = c.occurredAt;
+    }
+    return {for (final p in people) p.id: newest[p.id] ?? p.lastTalkedEstimate};
+  }
 
   // ---- Streams for screens (re-run when the data changes) ----
   Stream<PersonRow?> watchPerson(String id) => (db.select(db.people)

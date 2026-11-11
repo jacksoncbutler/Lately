@@ -28,5 +28,12 @@ class Tune {
 
   /// Used when the question is skipped.
   static const defaultLastTalkedDays = 180;
+
+  /// After tapping Contact, the log popup defaults to that person this long.
+  static const recentContactHours = 3;
+
+  /// Chat length buckets from the duration slider (minutes).
+  static const quickMaxMinutes = 20;
+  static const catchupMaxMinutes = 45;
   static const lengthMinutes = {'quick': 15, 'catchup': 30, 'long': 60};
 }

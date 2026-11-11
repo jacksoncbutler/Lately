@@ -29,3 +29,10 @@ Temporary identity (name, icon, package id `net.butler.lately`) is in `lib/app_c
 - Bulk-added people are "unfinished" (`needsFinishing`: timezone not confirmed) until you confirm where they are and roughly when you last talked, per person.
 - Widget tests that use drift streams must use the `testApp` helper pattern (unmount and close the database inside the test) or drift's stream timers fail the test.
 - Chat detail and the Log button arrive in step 6; Recent chats is read-only until then.
+
+## Step 6 notes
+
+- `lib/domain/chat_rules.dart` (pure): length buckets, when-it-happened rules (other day = date only, 12:00 local, approximate, never future), "ago" text, and who the popup starts on. The fallback "most overdue" is a stand-in until step 7 ports the real ranking; `defaultLogPersonId` should then take the hero's id.
+- `Repository.logChat` saves a chat, links covered Next time items, stamps lines and people added in the popup, clears skip and snooze, and clears the recent-contact prompt, all in one transaction.
+- `ProfileBlocks` (lib/features/profile) is shared by the profile and the log popup, so the line rules cannot drift between screens. Tests that look inside the popup must scope finders to `LogSheet`, because the profile underneath has the same keys.
+- Chat deletion has no UI yet (edge case for step 9); `Repository.deleteChat` exists and last contact recomputes from the remaining chats.

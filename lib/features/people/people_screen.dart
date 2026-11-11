@@ -5,6 +5,7 @@ import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../data/repository.dart';
 import '../../domain/timezones.dart';
+import '../../ui/log_fab.dart';
 import '../profile/finish_setup_sheet.dart';
 import '../profile/profile_screen.dart';
 import 'add_person_screen.dart';
@@ -36,20 +37,11 @@ class PeopleScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('People')),
-      body: people.isEmpty && archived.isEmpty
-          ? const Center(child: Text('No one yet.'))
-          : ListView(children: [
-              for (final p in people) ...[tile(p), const Divider(height: 1)],
-              if (archived.isNotEmpty)
-                ExpansionTile(
-                  key: const Key('archived-section'),
-                  title: Text('Archived (${archived.length})'),
-                  children: [for (final p in archived) tile(p)],
-                ),
-            ]),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: people.isEmpty ? null : const LogFab(),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
           child: Row(children: [
             Expanded(
               child: OutlinedButton(
@@ -67,7 +59,20 @@ class PeopleScreen extends ConsumerWidget {
             ),
           ]),
         ),
-      ),
+        Expanded(
+          child: people.isEmpty && archived.isEmpty
+              ? const Center(child: Text('No one yet.'))
+              : ListView(padding: const EdgeInsets.only(bottom: 96), children: [
+                  for (final p in people) ...[tile(p), const Divider(height: 1)],
+                  if (archived.isNotEmpty)
+                    ExpansionTile(
+                      key: const Key('archived-section'),
+                      title: Text('Archived (${archived.length})'),
+                      children: [for (final p in archived) tile(p)],
+                    ),
+                ]),
+        ),
+      ]),
     );
   }
 
