@@ -1,0 +1,1054 @@
+<title>Lately Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout concept: a phone-sized app on the left, a tuning panel (clock, numbers, live ranking) on the right.
+   On a narrow screen the app fills the page and the panel opens from the gear. */
+:root{
+  --stage:#ECE5D8; --paper:#FAF7F2; --surface:#FFFFFF; --ink:#23201C; --muted:#6A645C;
+  --line:#E6DFD3; --soft:#EFE9DF; --accent:#2E6F5E; --on-accent:#FFFFFF; --accent-soft:#DDEBE5;
+  --danger:#B3402A; --danger-soft:#F6E1DB; --scrim:rgba(35,32,28,.45);
+  --display:'Bricolage Grotesque','Figtree',system-ui,sans-serif;
+  --body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --stage:#0E0E0D; --paper:#171614; --surface:#1F1E1B; --ink:#F1EDE6; --muted:#A79F94;
+    --line:#35322D; --soft:#2A2824; --accent:#63B89E; --on-accent:#0E1D18; --accent-soft:#1F3A31;
+    --danger:#E5826C; --danger-soft:#3C231D; --scrim:rgba(0,0,0,.6); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --stage:#0E0E0D; --paper:#171614; --surface:#1F1E1B; --ink:#F1EDE6; --muted:#A79F94;
+  --line:#35322D; --soft:#2A2824; --accent:#63B89E; --on-accent:#0E1D18; --accent-soft:#1F3A31;
+  --danger:#E5826C; --danger-soft:#3C231D; --scrim:rgba(0,0,0,.6); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--stage);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.4;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+button,input,select{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stage{display:flex;gap:32px;justify-content:center;align-items:flex-start;padding-block:16px}
+.phone{position:relative;width:390px;flex:none;height:min(844px,calc(100dvh - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
+  background:var(--paper);border:1px solid var(--line);border-radius:36px;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 24px 60px -28px rgba(0,0,0,.45)}
+.panel{width:430px;flex:none;max-height:min(844px,calc(100dvh - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
+  overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px}
+@media (max-width:979px){
+  .stage{padding-block:8px}
+  .phone{width:100%;border-radius:22px;height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+}
+.appbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 6px;min-height:58px}
+.appbar h1{margin:0;font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:-.01em}
+.iconbtn{width:44px;height:44px;border-radius:22px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;padding:0}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;min-height:0}
+.nav{display:flex;border-top:1px solid var(--line);background:var(--surface);padding:6px 10px 10px;flex:none}
+.navbtn{flex:1;height:52px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);font-size:12px;font-weight:600}
+.navbtn[aria-current="page"]{color:var(--accent)}
+.fab{position:absolute;left:50%;transform:translateX(-50%);bottom:84px;width:58px;height:58px;border-radius:29px;border:4px solid var(--paper);background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);z-index:5}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:18px}
+.eyebrow{margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.row{display:flex;align-items:center;gap:12px}
+.avatar{flex:none;border-radius:50%;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700}
+.name{font-family:var(--display);font-weight:700;letter-spacing:-.01em}
+.tag{display:inline-block;background:var(--soft);border-radius:10px;padding:2px 10px;font-size:12px;font-weight:600;color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.btn{height:48px;border-radius:15px;border:1px solid var(--line);background:var(--surface);font-weight:600;padding:0 16px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary[disabled]{opacity:.45;cursor:not-allowed}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.sm{height:44px;font-weight:500}
+.btn.full{width:100%}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;min-height:44px;padding:0 4px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.slide{display:block;width:calc(100% - 24px);margin:0 12px;height:44px;accent-color:var(--accent);background:transparent}
+.snaplabels{display:flex;justify-content:space-between;margin-top:-6px}
+.snaplabels button{width:44px;min-height:44px;border:0;background:transparent;color:var(--muted);font-weight:500;padding:0;text-align:center}
+.snaplabels button[aria-pressed="true"]{color:var(--ink);font-weight:700}
+.quietrow{display:flex;border-top:1px solid var(--line);margin:14px -18px -18px}
+.quiet{flex:1;min-height:50px;border:0;background:transparent;color:var(--muted);font-weight:500}
+.quiet+.quiet{border-left:1px solid var(--line)}
+.popwrap{position:relative}
+.pop{position:absolute;right:0;bottom:56px;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 28px -12px rgba(0,0,0,.4);overflow:hidden;z-index:6;min-width:180px}
+.pop button{display:block;width:100%;text-align:left;min-height:48px;padding:0 16px;border:0;background:transparent;font-weight:500}
+.pop button+button{border-top:1px solid var(--line)}
+.chip{min-height:44px;padding:0 16px;border-radius:22px;border:1.5px solid transparent;background:var(--soft);font-weight:500}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.seg{display:flex;gap:4px;background:var(--soft);border-radius:16px;padding:4px}
+.seg button{flex:1;min-height:44px;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--muted);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface);border-color:var(--line);color:var(--ink);font-weight:600}
+.check{display:flex;align-items:center;gap:12px;min-height:44px}
+.check input{width:22px;height:22px;margin:0;accent-color:var(--accent);flex:none}
+.done{text-decoration:line-through;color:var(--muted)}
+.field{width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:0 12px}
+.lbl{display:block;margin:12px 0 6px;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.divider{height:1px;background:var(--line);margin:14px 0}
+.strip{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0 16px}
+.strip .row{justify-content:space-between;min-height:46px}
+.strip .row+.row{border-top:1px solid var(--line)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:6px 14px 4px;min-width:0}
+.tile.wide{grid-column:1/-1}
+.tile h3{margin:0;font-family:var(--display);font-size:16px;font-weight:700}
+.tile .hd{display:flex;align-items:center;justify-content:space-between;min-height:44px}
+.plus{width:44px;height:44px;margin-right:-12px;border:0;background:transparent;color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0}
+.ruled{height:44px;border-top:1px solid var(--line)}
+.scrim.top{z-index:32}.sheet.top{z-index:33}
+.slim{grid-column:1/-1;min-height:44px;border:1.5px dashed var(--line);border-radius:16px;background:transparent;color:var(--muted);font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px}
+.swipe{position:relative;border-top:1px solid var(--line);overflow:hidden}
+.swipe-bg{position:absolute;inset:0;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700}
+.swipe-bg .act{padding:0 16px;height:100%;display:flex;align-items:center}
+.swipe-bg .del{background:var(--danger-soft);color:var(--danger)}
+.swipe-row{position:relative;background:var(--surface);min-height:44px;display:flex;align-items:center;gap:10px;touch-action:pan-y;user-select:none;-webkit-user-select:none;transition:transform .18s ease}
+.swipe-row.dragging{transition:none}
+.swipe-row .txt{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14.5px;padding:6px 0}
+.edit-row{display:flex;align-items:center;gap:2px;padding-right:2px}
+.edit-row .edit-input{flex:1;min-width:0;width:auto;border-top:0}
+.iconbtn2{flex:none;width:40px;height:40px;border:0;background:transparent;color:var(--danger);display:flex;align-items:center;justify-content:center;border-radius:12px}
+.chatrow{background:transparent;border:0;border-top:1px solid var(--line);color:inherit;font:inherit;cursor:pointer;border-radius:0}
+.chevtag{display:flex;align-items:center;gap:6px;color:var(--muted)}
+.edit-input{width:100%;min-height:44px;border:0;border-top:1px solid var(--line);background:var(--surface);padding:0 2px;outline:none;font-size:14.5px}
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:20}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:94%;background:var(--paper);border-radius:28px 28px 0 0;z-index:21;display:flex;flex-direction:column;animation:rise .22s ease}
+@keyframes rise{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}.swipe-row{transition:none}}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 0;flex:none}
+.sheet>.hd{display:flex;align-items:center;justify-content:space-between;padding:6px 18px 0;min-height:52px;flex:none}
+.sheet>.hd h2{margin:0;font-family:var(--display);font-size:21px}
+.sheet .body{overflow-y:auto;padding:0 18px 16px;min-height:0}
+.sheet .ft{padding:10px 18px 18px;border-top:1px solid var(--line);flex:none}
+.toast{position:absolute;left:14px;right:14px;bottom:84px;z-index:30;background:var(--ink);color:var(--paper);border-radius:14px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.toast button{border:0;background:transparent;color:var(--accent-soft);font-weight:700;min-height:36px;padding:0 6px}
+.fact{min-width:0}.fl{font-size:12px;color:var(--muted)}.fv{font-weight:500;overflow-wrap:anywhere}
+.list .row{min-height:60px;border-top:1px solid var(--line);width:100%;background:transparent;border-left:0;border-right:0;border-bottom:0;text-align:left;padding:8px 0}
+.list .row:first-child{border-top:0}
+table.rank{width:100%;border-collapse:collapse;font-size:12.5px}
+table.rank th{text-align:left;font-weight:600;color:var(--muted);padding:6px 6px 6px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+table.rank td{padding:7px 6px 7px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+table.rank tr.hero td{font-weight:700;color:var(--accent)}
+.tw{overflow-x:auto}
+.numgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.numgrid label{font-size:12px;color:var(--muted);display:block}
+.numgrid input{width:100%;min-height:40px;border-radius:10px;border:1px solid var(--line);background:var(--paper);padding:0 8px}
+.panel h2{margin:0 0 4px;font-family:var(--display);font-size:20px}
+.panel h3{margin:18px 0 8px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.try{margin:0;padding-left:18px;color:var(--muted);font-size:13.5px}
+.try li{margin:3px 0}
+.empty{padding:24px 8px;text-align:center;color:var(--muted)}
+</style>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>
+/*LOGIC_START*/
+var DAY=86400000;
+var USER_TZ=(function(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){return 'UTC'}})();
+var GROUPS=[{id:'parents',name:'Parents'},{id:'siblings',name:'Siblings'},{id:'friends',name:'Friends'}];
+var LEN_LABEL={quick:'Quick',catchup:'Catch-up',long:'Long'};
+var DEPTH_LABEL={shallow:'Shallow',varied:'Varied',deep:'Deep'};
+var TYPE_LABEL={person:'In person',call:'Call',text:'Text'};
+var TUNE0={groupInterval:{parents:14,siblings:21,friends:30},lenMin:{quick:15,catchup:30,long:60},awakeStart:8,awakeEnd:22,snoozeDays:7,chip15Max:20,chip30Min:20,chipLongMin:50,lastN:5,dueFloor:0.6,chipPenalty:0.6,gapBoost:2,gapRatio:4,trustChats:5,historyDamp:0.6,expCap:90};
+var CITIES=[['Lisbon','Europe/Lisbon'],['London','Europe/London'],['Berlin','Europe/Berlin'],['Madrid','Europe/Madrid'],['Paris','Europe/Paris'],['Athens','Europe/Athens'],['Istanbul','Europe/Istanbul'],['Cairo','Africa/Cairo'],['Nairobi','Africa/Nairobi'],['Lagos','Africa/Lagos'],['Johannesburg','Africa/Johannesburg'],['Dubai','Asia/Dubai'],['Mumbai','Asia/Kolkata'],['Bangkok','Asia/Bangkok'],['Manila','Asia/Manila'],['Singapore','Asia/Singapore'],['Tokyo','Asia/Tokyo'],['Seoul','Asia/Seoul'],['Perth','Australia/Perth'],['Sydney','Australia/Sydney'],['Auckland','Pacific/Auckland'],['Honolulu','Pacific/Honolulu'],['Anchorage','America/Anchorage'],['Los Angeles','America/Los_Angeles'],['Vancouver','America/Vancouver'],['Denver','America/Denver'],['Mexico City','America/Mexico_City'],['Chicago','America/Chicago'],['New York','America/New_York'],['Bogota','America/Bogota'],['Sao Paulo','America/Sao_Paulo']];
+var STATUS_LABEL={ok:'',asleep:'Asleep',today:'Talked today',notdue:'Not due',skipped:'Skipped',snoozed:'Snoozed',archived:'Archived'};
+var LAST_TALKED=[['A week',7],['Two weeks',14],['A month',30],['A few months',90],['Six months',180],['A year or more',360]];
+
+function pad(n){return String(n).padStart(2,'0')}
+function uid(){return Math.random().toString(36).slice(2,9)}
+function hm(tz,ms){
+  try{
+    var parts=new Intl.DateTimeFormat('en-US',{timeZone:tz,hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(ms);
+    var H=0,M=0;
+    parts.forEach(function(x){if(x.type==='hour')H=(+x.value)%24;if(x.type==='minute')M=+x.value});
+    return {h:H,m:M};
+  }catch(e){var d=new Date(ms);return {h:d.getHours(),m:d.getMinutes()}}
+}
+function clockStr(tz,ms){
+  try{
+    return new Intl.DateTimeFormat('en-US',{timeZone:tz,hour:'numeric',minute:'2-digit'}).format(ms).replace(/\s?(AM|PM)/i,function(m,a){return ' '+a.toLowerCase()});
+  }catch(e){return ''}
+}
+function ymd(tz,ms){
+  try{return new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(ms)}
+  catch(e){var d=new Date(ms);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+}
+function cityOf(tz){return String(tz).split('/').pop().replace(/_/g,' ')}
+function intervalOf(p,tune){return p.intervalOverride||tune.groupInterval[p.group]||30}
+function lastChatAt(p,type){var m=0;p.chats.forEach(function(c){if((!type||c.type===type)&&c.at>m)m=c.at});return m}
+function lastContactMs(p,now){var m=lastChatAt(p);return m||now-(p.estimate==null?180:p.estimate)*DAY}
+function chatMinutes(c,tune){return c.duration>0?c.duration:(tune.lenMin[c.length]||30)}
+function expectedInfo(p,tune,ratio){
+  var n=p.chats.length,base=30;
+  if(n){
+    var last=p.chats.slice().sort(function(a,b){return b.at-a.at}).slice(0,tune.lastN);
+    base=last.reduce(function(s,c){return s+chatMinutes(c,tune)},0)/last.length;
+  }
+  var r=ratio==null?1:ratio,boost=1;
+  if(r>1)boost=1+(tune.gapBoost-1)*Math.min(1,(r-1)/Math.max(0.5,tune.gapRatio-1));
+  var trust=Math.min(1,n/Math.max(1,tune.trustChats));
+  var f=1+(boost-1)*(1-tune.historyDamp*trust);
+  var m=Math.max(5,Math.min(tune.expCap,Math.round(base*f/5)*5));
+  return {min:m,sure:n>=3&&f<1.15};
+}
+function statusOf(p,now,tune){
+  if(p.archived)return 'archived';
+  if(p.snoozedUntil&&p.snoozedUntil>now)return 'snoozed';
+  if(p.skippedDay&&p.skippedDay===ymd(USER_TZ,now))return 'skipped';
+  var lc=lastChatAt(p);
+  if(lc&&ymd(USER_TZ,lc)===ymd(USER_TZ,now))return 'today';
+  var t=hm(p.tz,now),mins=t.h*60+t.m;
+  if(mins<tune.awakeStart*60||mins>=tune.awakeEnd*60)return 'asleep';
+  return 'ok';
+}
+function rank(people,now,tune){
+  var rows=people.filter(function(p){return !p.archived}).map(function(p){
+    var last=lastContactMs(p,now),days=Math.max(0,(now-last)/DAY),iv=intervalOf(p,tune),ratio=days/iv;
+    var st=statusOf(p,now,tune);
+    if((st==='ok'||st==='asleep')&&ratio<tune.dueFloor)st='notdue';
+    var info=expectedInfo(p,tune,ratio);
+    return {p:p,days:days,iv:iv,ratio:ratio,status:st,exp:info.min,sure:info.sure};
+  });
+  rows.sort(function(a,b){
+    var ao=a.status==='ok'?0:1,bo=b.status==='ok'?0:1;
+    if(ao!==bo)return ao-bo;
+    if(b.ratio!==a.ratio)return b.ratio-a.ratio;
+    if(b.days!==a.days)return b.days-a.days;
+    return a.p.name.localeCompare(b.p.name);
+  });
+  return rows;
+}
+function chipFits(chip,exp,tune){
+  if(chip==='15')return exp<=tune.chip15Max;
+  if(chip==='30')return exp>=tune.chip30Min;
+  if(chip==='long')return exp>=tune.chipLongMin;
+  return true;
+}
+function pickHero(rows,chip,tune){
+  var ok=rows.filter(function(r){return r.status==='ok'});
+  if(!ok.length)return {row:null,note:''};
+  var best=null,bs=-1,bfit=true;
+  ok.forEach(function(r){
+    var fit=!chip||chipFits(chip,r.exp,tune),sc=r.ratio*(fit?1:tune.chipPenalty);
+    if(sc>bs){bs=sc;best=r;bfit=fit}
+  });
+  var note='';
+  if(chip&&!bfit)note=chip==='15'?'A quick hello still counts.':'Not a perfect fit for that, but they are the most due.';
+  return {row:best,note:note};
+}
+function wakeInMin(p,now,tune){var t=hm(p.tz,now),cur=t.h*60+t.m,s=tune.awakeStart*60;return cur<s?s-cur:1440-cur+s}
+function whyLine(r){
+  var over=r.days-r.iv,a;
+  if(over>=90)a='Overdue by '+Math.floor(over/30)+' months';
+  else if(over>=14)a='Overdue by '+Math.floor(over/7)+' weeks';
+  else if(over>=1)a='Overdue by '+Math.floor(over)+(Math.floor(over)===1?' day':' days');
+  else if(over>-1)a='Due today';
+  else a='Due in '+Math.ceil(-over)+(Math.ceil(-over)===1?' day':' days');
+  a+=' · '+(r.sure?'usually':'probably')+' a '+r.exp+' minute '+(r.exp<=20?'check-in':r.exp<=45?'catch-up':'long chat');
+  return a;
+}
+function agoText(days){
+  if(days<1)return 'today';
+  if(days<14)return Math.floor(days)+(Math.floor(days)===1?' day ago':' days ago');
+  if(days<60)return Math.floor(days/7)+' weeks ago';
+  return Math.floor(days/30)+' months ago';
+}
+function upcoming(people,now,limitDays){
+  var t=ymd(USER_TZ,now).split('-').map(Number),today=Date.UTC(t[0],t[1]-1,t[2]),out=[];
+  function add(label,sub,mmdd,pid){
+    if(!mmdd)return;
+    var m=/^(\d\d)-(\d\d)$/.exec(mmdd);
+    if(!m)return;
+    var c=Date.UTC(t[0],+m[1]-1,+m[2]);
+    if(c<today)c=Date.UTC(t[0]+1,+m[1]-1,+m[2]);
+    var days=Math.round((c-today)/DAY);
+    if(days<=limitDays)out.push({label:label,sub:sub,days:days,at:c,pid:pid});
+  }
+  people.forEach(function(p){
+    if(p.archived)return;
+    add(p.name+"'s birthday",'',p.birthday,p.id);
+    p.rels.forEach(function(f){add(f.name+"'s birthday",p.name+"'s "+(f.relation||'person'),f.birthday,p.id)});
+  });
+  out.sort(function(a,b){return a.days-b.days});
+  return out;
+}
+function dateLabel(at){return new Date(at).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'})}
+function fmtDate(ms,now){
+  var d=new Date(ms),same=new Date(now).getFullYear()===d.getFullYear();
+  return d.toLocaleDateString('en-US',same?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'});
+}
+function sampleData(now){
+  var bd=function(n){var d=new Date(now+n*DAY);return pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())};
+  var ch=function(daysAgo,type,length,depth,duration,feelings){return {id:uid(),at:now-daysAgo*DAY,type:type,length:length,depth:depth,duration:duration||0,feelings:feelings||[]}};
+  var ln=function(block,text,done){return {id:uid(),block:block,text:text,done:!!done}};
+  var rel=function(name,relation,birthday,notes){return {id:uid(),name:name,relation:relation,birthday:birthday||'',notes:(notes||[]).map(function(t){return {id:uid(),text:t}})}};
+  var P=function(o){return Object.assign({id:uid(),name:'',group:'friends',tz:'UTC',contact:{type:'text',value:''},birthday:'',chats:[],lines:[],rels:[],hometown:'',socials:'',estimate:null,intervalOverride:0,snoozedUntil:0,skippedDay:'',archived:false},o)};
+  var people=[
+    P({name:'Sam',group:'friends',tz:'Europe/Lisbon',contact:{type:'text',value:'+351 555 0142'},birthday:'03-14',hometown:'Porto',socials:'@sam.r',
+      chats:[ch(51,'call','catchup','varied',0,['happy']),ch(70,'text','quick','shallow'),ch(104,'person','long','deep',150,['excited'])],
+      lines:[ln('next_time','Ask about the new job'),ln('next_time','Did the move go ahead?'),ln('next_time','Send the trail photos'),ln('interests','Trail running'),ln('interests','Pottery'),ln('interests','Fado'),ln('interests','Film photography'),ln('interests','Sourdough'),ln('interests','Chess'),ln('about','Works in logistics'),ln('about','Moved flats in 2024'),ln('about','Allergic to cats')],
+      rels:[rel('Maria','mother','06-02',['Retired teacher','Loves the garden']),rel('Tomas','brother','11-23'),rel('Ines','partner','09-09',['Nurse']),rel('Rosa','grandmother')]}),
+    P({name:'Mom',group:'parents',tz:'America/Chicago',contact:{type:'call',value:'+1 555 0100'},birthday:bd(3),hometown:'Madison',
+      chats:[ch(9,'call','catchup','deep',40,['happy']),ch(24,'call','catchup','varied')],
+      lines:[ln('next_time','Ask how the garden is doing'),ln('about','Walks every morning')],rels:[rel('Gran','grandmother')]}),
+    P({name:'Dad',group:'parents',tz:'America/Chicago',contact:{type:'call',value:'+1 555 0101'},birthday:'08-19',
+      chats:[ch(31,'call','quick','shallow'),ch(52,'call','quick','shallow')],lines:[ln('next_time','Did he fix the boat trailer?'),ln('interests','Fishing'),ln('interests','Woodworking')]}),
+    P({name:'Kate',group:'siblings',tz:'America/Denver',contact:{type:'text',value:'+1 555 0177'},birthday:'01-30',
+      chats:[ch(40,'text','quick','shallow'),ch(70,'call','long','deep',75)],lines:[ln('next_time','Ask about the new apartment'),ln('about','Training for a half marathon')]}),
+    P({name:'Alex',group:'friends',tz:'Australia/Sydney',contact:{type:'text',value:'+61 555 0103'},birthday:bd(6),estimate:60,lines:[ln('about','Met at the dive shop in Cebu')]}),
+    P({name:'Priya',group:'friends',tz:'Asia/Kolkata',contact:{type:'text',value:'+91 555 0121'},birthday:'12-05',
+      chats:[ch(15,'text','catchup','varied'),ch(40,'call','long','deep',70)],lines:[ln('interests','Bouldering')]}),
+    P({name:'Marcus',group:'friends',tz:'America/New_York',contact:{type:'call',value:'+1 555 0188'},birthday:'05-21',
+      chats:[ch(62,'call','long','deep',90,['excited']),ch(120,'call','catchup','varied')],lines:[ln('next_time','Ask how the new job is going'),ln('about','Just had a baby')],rels:[rel('Dana','partner'),rel('Theo','child','10-03')]}),
+    P({name:'Noor',group:'friends',tz:'Asia/Dubai',contact:{type:'text',value:'+971 555 0132'},birthday:'07-08',
+      chats:[ch(33,'call','quick','shallow'),ch(60,'call','quick','shallow'),ch(90,'text','quick','shallow')],lines:[ln('about','Always up for a quick call')]}),
+    P({name:'Jun',group:'friends',tz:'Asia/Tokyo',contact:{type:'text',value:'+81 555 0144'},birthday:'02-17',estimate:30}),
+    P({name:'Elena',group:'friends',tz:'Europe/Berlin',contact:{type:'text',value:'+49 555 0166'},birthday:'04-11',
+      chats:[ch(100,'person','long','deep',180,['happy']),ch(130,'call','catchup','varied')],lines:[ln('next_time','Ask about the thesis')]}),
+    P({name:'Lena',group:'siblings',tz:'Europe/London',contact:{type:'text',value:'+44 555 0155'},birthday:'10-02',chats:[ch(0,'call','catchup','varied')]}),
+    P({name:'Ruth',group:'friends',tz:'Pacific/Auckland',contact:{type:'text',value:'+64 555 0199'},birthday:'09-27',chats:[ch(80,'person','long','deep',120)]})
+  ];
+  var sam=people[0],c0=sam.chats[0];
+  sam.lines.forEach(function(l){if(l.text==='Sourdough'||l.text==='Film photography'||l.text==='Moved flats in 2024')l.addedIn=c0.id});
+  sam.rels.forEach(function(r){if(r.name==='Ines')r.addedIn=c0.id});
+  c0.note='Caught up on the move and the trail photos. He is thinking about a pottery class.';
+  return {people:people,custom:[],tune:JSON.parse(JSON.stringify(TUNE0))};
+}
+/*LOGIC_END*/
+
+(function(){
+var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef,useMemo=React.useMemo;
+var h=React.createElement;
+function T(tag){return function(props){var kids=[].slice.call(arguments,1);return h.apply(null,[tag,props].concat(kids))}}
+var div=T('div'),span=T('span'),button=T('button'),input=T('input'),para=T('p'),section=T('section'),label=T('label'),select=T('select'),option=T('option'),nav=T('nav'),h1=T('h1'),h2=T('h2'),h3=T('h3'),table=T('table'),thead=T('thead'),tbody=T('tbody'),tr=T('tr'),th=T('th'),td=T('td'),ol=T('ol'),li=T('li');
+
+var KEY='lately-prototype-v2';
+function loadData(){
+  try{
+    var s=localStorage.getItem(KEY);
+    if(s){var d=JSON.parse(s);if(d&&d.people&&d.tune){d.tune=Object.assign({},TUNE0,d.tune);d.tune.groupInterval=Object.assign({},TUNE0.groupInterval,d.tune.groupInterval);d.tune.lenMin=Object.assign({},TUNE0.lenMin,d.tune.lenMin);d.custom=d.custom||[];return d}}
+  }catch(e){}
+  return sampleData(Date.now());
+}
+function saveData(d){try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}}
+
+var PATHS={home:['M3 11l9-8 9 8','M5 10v10h14V10'],people:['M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6','M16 4.6a3.5 3.5 0 0 1 0 6.8','M18 14.3c2.2.7 3.5 2.6 3.5 5.7'],
+  cal:['M6 5h12a2.5 2.5 0 0 1 2.5 2.5v10A2.5 2.5 0 0 1 18 20H6a2.5 2.5 0 0 1-2.5-2.5v-10A2.5 2.5 0 0 1 6 5z','M3.5 10h17','M8 3v4','M16 3v4'],
+  gear:['M4 7h9','M17 7h3','M4 17h3','M11 17h9'],chat:['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z','M12 7v6','M9 10h6'],
+  back:['M15 5l-7 7 7 7'],plus:['M12 5v14','M5 12h14'],x:['M6 6l12 12','M18 6L6 18'],trash:['M4 7h16','M10 11v6','M14 11v6','M6 7l1 12h10l1-12','M9 7V4h6v3'],chev:['M9 5l7 7-7 7']};
+var CIRC={people:[[9,8,3.5]],gear:[[15,7,2],[9,17,2]]};
+function Icon(props){
+  var ps=PATHS[props.n]||[],cs=CIRC[props.n]||[];
+  return h('svg',{viewBox:'0 0 24 24',width:props.s||22,height:props.s||22,fill:'none',stroke:'currentColor',strokeWidth:props.w||1.8,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':'true'},
+    ps.map(function(d,i){return h('path',{key:'p'+i,d:d})}),cs.map(function(c,i){return h('circle',{key:'c'+i,cx:c[0],cy:c[1],r:c[2]})}));
+}
+function Avatar(props){var s=props.size||44;return div({className:'avatar',style:{width:s,height:s,fontSize:Math.round(s*.42)}},(props.name||'?').charAt(0).toUpperCase())}
+
+/* ---------- swipe line ---------- */
+function SwipeLine(props){
+  var _a=useState(0),dx=_a[0],setDx=_a[1];
+  var _b=useState(false),editing=_b[0],setEditing=_b[1];
+  var _c=useState(props.text),val=_c[0],setVal=_c[1];
+  var st=useRef(null),dragged=useRef(false),finished=useRef(false);
+  function startEdit(){
+    if(props.onEditRequest){props.onEditRequest();return}
+    finished.current=false;setVal(props.text);setEditing(true);
+  }
+  function down(e){if(editing)return;st.current={x:e.clientX,y:e.clientY,drag:false}}
+  function move(e){
+    var s=st.current;if(!s)return;
+    var ddx=e.clientX-s.x,ddy=e.clientY-s.y;
+    if(!s.drag&&Math.abs(ddx)>8&&Math.abs(ddx)>Math.abs(ddy)){s.drag=true;try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){}}
+    if(s.drag)setDx(Math.max(-120,Math.min(0,ddx)));
+  }
+  function up(){
+    var s=st.current;st.current=null;
+    if(!s||!s.drag){setDx(0);return}
+    dragged.current=true;setTimeout(function(){dragged.current=false},0);
+    var d=dx;setDx(0);
+    if(d<=-72)props.onDelete();
+  }
+  function commit(){
+    if(finished.current)return;finished.current=true;
+    var t=val.trim();setEditing(false);
+    if(t&&t!==props.text)props.onSave(t);
+  }
+  if(editing){
+    return div({className:'swipe edit-row'},h('input',{className:'edit-input','aria-label':'Edit line',autoFocus:true,value:val,
+      onChange:function(e){setVal(e.target.value)},onBlur:commit,
+      onKeyDown:function(e){if(e.key==='Enter')commit();if(e.key==='Escape'){e.preventDefault();finished.current=true;setEditing(false)}}}),
+      button({className:'iconbtn2','aria-label':'Delete line',onMouseDown:function(e){e.preventDefault()},onClick:function(){finished.current=true;setEditing(false);props.onDelete()}},h(Icon,{n:'trash',s:20,w:1.8})));
+  }
+  return div({className:'swipe'},
+    div({className:'swipe-bg','aria-hidden':'true'},
+      span({className:'act del',style:{opacity:dx<0?1:0,marginLeft:'auto'}},'Delete')),
+    div({className:'swipe-row'+(dx?' dragging':''),style:{transform:'translateX('+dx+'px)'},tabIndex:0,
+      onPointerDown:down,onPointerMove:move,onPointerUp:up,onPointerCancel:function(){st.current=null;setDx(0)},
+      onClick:function(){if(dragged.current)return;if(props.onTap)props.onTap();else startEdit()},
+      onKeyDown:function(e){
+        if(e.target!==e.currentTarget)return;
+        if(e.key==='Enter')startEdit();
+        if(e.key==='Delete'||e.key==='Backspace')props.onDelete();
+      }},
+      props.lead||null,
+      span({className:'txt'+(props.dim?' done':'')},props.text)));
+}
+function AddLine(props){
+  var _a=useState(''),v=_a[0],setV=_a[1];
+  var closed=useRef(false);
+  function close(){if(closed.current)return;closed.current=true;props.onClose()}
+  return h('input',{className:'edit-input',autoFocus:true,value:v,placeholder:props.placeholder||'Add a short line',
+    'aria-label':props.placeholder||'Add a short line',
+    onChange:function(e){setV(e.target.value)},
+    onBlur:function(){var t=v.trim();if(t)props.onAdd(t);close()},
+    onKeyDown:function(e){
+      if(e.key==='Enter'){var t=v.trim();if(t){props.onAdd(t);setV('')}}
+      if(e.key==='Escape'){e.preventDefault();setV('');close()}
+    }});
+}
+function Block(props){
+  var _a=useState(false),adding=_a[0],setAdding=_a[1];
+  var _b=useState(false),open=_b[0],setOpen=_b[1];
+  var lines=props.lines,next=!!props.next,all=next||!!props.wide,wide=all||open;
+  function start(){props.onAddRequest?props.onAddRequest():setAdding(true)}
+  var shown=all?lines:(open?lines.slice().reverse():lines.slice().reverse().slice(0,3));
+  var blanks=open&&!all?0:Math.max(0,3-shown.length-(adding?1:0));
+  var ruled=[];for(var i=0;i<blanks;i++)ruled.push(div({key:'r'+i,className:'ruled','aria-hidden':'true',onClick:start}));
+  return div({className:'tile'+(wide?' wide':'')},
+    div({className:'hd'},h3(null,props.title),
+      button({className:'plus','aria-label':'Add to '+props.title,onClick:start},h(Icon,{n:'plus',s:22,w:2}))),
+    adding?h(AddLine,{placeholder:'Add to '+props.title.toLowerCase(),onAdd:props.onAdd,onClose:function(){setAdding(false)}}):null,
+    shown.map(function(l){
+      return h(SwipeLine,{key:l.id,text:l.text,dim:next&&l.done,
+        lead:next?input({type:'checkbox',checked:!!l.done,'aria-label':'Done: '+l.text,style:{width:22,height:22,margin:0,accentColor:'var(--accent)',flex:'none'},onClick:function(e){e.stopPropagation()},onChange:function(){props.onToggle(l.id)}}):null,
+        onSave:function(t){props.onSave(l.id,t)},onDelete:function(){props.onDelete(l.id)},
+        onTap:props.onTapLine?function(){props.onTapLine(l.id)}:null,
+        onEditRequest:props.onTapLine?function(){props.onTapLine(l.id)}:null});
+    }),
+    ruled,
+    (!all&&lines.length>3)?button({className:'linkbtn',onClick:function(){setOpen(!open)}},open?'Show less':'See all ('+lines.length+')'):null);
+}
+
+/* ---------- sheet ---------- */
+function Sheet(props){
+  useEffect(function(){
+    function k(e){if(e.key==='Escape'){if(e.defaultPrevented)return;if(!props.top&&document.querySelector('.sheet.top'))return;props.onClose()}}
+    window.addEventListener('keydown',k);return function(){window.removeEventListener('keydown',k)};
+  },[]);
+  return h(React.Fragment,null,
+    div({className:'scrim'+(props.top?' top':''),onClick:props.onClose}),
+    div({className:'sheet'+(props.top?' top':''),role:'dialog','aria-modal':'true','aria-label':props.title},
+      div({className:'grab'}),
+      div({className:'hd'},h2(null,props.title),button({className:'iconbtn',style:{border:0,background:'transparent'},'aria-label':'Close',onClick:props.onClose},h(Icon,{n:'x'}))),
+      div({className:'body'},props.children),
+      props.footer?div({className:'ft'},props.footer):null));
+}
+var CHIP_OPTS=[['','Any'],['15','15'],['30','30'],['long','60+']];
+function Snap(props){
+  var opts=props.options,i=Math.max(0,Math.min(opts.length-1,props.index));
+  return div({className:'snap'},
+    input({className:'slide',type:'range',min:0,max:opts.length-1,step:1,value:i,'aria-label':props.label,'aria-valuetext':props.valueText?props.valueText(i):opts[i][1],onChange:function(e){props.onChange(Number(e.target.value))}}),
+    div({className:'snaplabels'},opts.map(function(o,k){return button({key:o[0]||'any',type:'button','aria-pressed':k===i,onClick:function(){props.onChange(k)}},o[1])})));
+}
+function DurSlider(props){
+  var v=props.value;
+  return div(null,
+    div({className:'row',style:{justifyContent:'space-between',padding:'0 4px'}},span({className:'small muted'},'1 min'),span({style:{fontWeight:600}},v>=60?'60+ min':v+' min'),span({className:'small muted'},'60+')),
+    input({id:props.id,className:'slide',type:'range',min:1,max:60,step:1,value:v,'aria-label':'How long, in minutes','aria-valuetext':v>=60?'60 or more minutes':v+' minutes',onChange:function(e){props.onChange(Number(e.target.value))}}));
+}
+function Seg(props){
+  return div({className:'seg',role:'group','aria-label':props.label},props.options.map(function(o){
+    return button({key:o[0],type:'button','aria-pressed':props.value===o[0],onClick:function(){props.onChange(o[0])}},o[1]);
+  }));
+}
+
+/* ---------- person picker ---------- */
+function Picker(props){
+  var _a=useState(''),q=_a[0],setQ=_a[1];
+  var rows=props.rows.filter(function(r){return !q.trim()||r.p.name.toLowerCase().indexOf(q.trim().toLowerCase())>=0});
+  return div(null,
+    div({className:'row',style:{margin:'4px 0 10px'}},
+      input({id:'pick-search',className:'field',autoFocus:true,'aria-label':'Search people',placeholder:'Search people',value:q,onChange:function(e){setQ(e.target.value)}}),
+      button({className:'linkbtn',style:{flex:'none'},onClick:props.onBack},'Back')),
+    GROUPS.map(function(g){
+      var rs=rows.filter(function(r){return r.p.group===g.id}).sort(function(x,y){return y.days-x.days});
+      if(!rs.length)return null;
+      return div({key:g.id,style:{marginBottom:12}},para({className:'eyebrow'},g.name),
+        div({className:'card list',style:{padding:'0 16px'}},rs.map(function(r){
+          return button({key:r.p.id,className:'row',onClick:function(){props.onPick(r.p.id)}},h(Avatar,{name:r.p.name,size:40}),
+            div({style:{flex:1,minWidth:0}},div({style:{fontWeight:600}},r.p.name),div({className:'muted small'},'Last talked '+agoText(r.days))),
+            props.suggestedId===r.p.id?span({className:'tag'},'Suggested'):null);
+        })));
+    }),
+    !rows.length?div({className:'empty'},'No one matches that search.'):null);
+}
+
+/* ---------- log sheet ---------- */
+function LogSheet(props){
+  var people=props.people,now=props.now;
+  var _a=useState(props.defaultId),pid=_a[0],setPid=_a[1];
+  var _b=useState(''),type=_b[0],setType=_b[1];
+  var _d=useState(''),depth=_d[0],setDepth=_d[1];
+  var _e=useState(30),dur=_e[0],setDur=_e[1];
+  var length=dur<=20?'quick':dur<=45?'catchup':'long';
+  var _f=useState([]),feel=_f[0],setFeel=_f[1];
+  var _w=useState('now'),when=_w[0],setWhen=_w[1];
+  var _wd=useState(''),wdate=_wd[0],setWdate=_wd[1];
+  var _pk=useState(false),picking=_pk[0],setPicking=_pk[1];
+  var _ro=useState(null),relOpen=_ro[0],setRelOpen=_ro[1];
+  var person=people.find(function(x){return x.id===pid})||people[0];
+  var prow=props.rows.find(function(r){return r.p.id===person.id});
+  var offers=person.lines.filter(function(l){return l.block==='next_time'&&l.done&&!l.chatId});
+  var _g=useState(null),covered=_g[0],setCovered=_g[1];
+  var cov=covered||offers.map(function(l){return l.id});
+  var _h=useState([]),pending=_h[0],setPending=_h[1];
+  var _ad=useState({lines:[],rels:[]}),added=_ad[0],setAdded=_ad[1];
+  var _nt=useState(''),note=_nt[0],setNote=_nt[1];
+  var _i=useState(null),addBlock=_i[0],setAddBlock=_i[1];
+  var _j=useState(''),draft=_j[0],setDraft=_j[1];
+  var stamp=now;
+  if(when==='yesterday')stamp=now-DAY;
+  else if(when==='date'&&wdate){var ps=wdate.split('-');var tt=new Date(+ps[0],+ps[1]-1,+ps[2],12,0,0).getTime();if(isFinite(tt))stamp=Math.min(tt,now)}
+  var ready=type&&length&&depth&&(when!=='date'||wdate);
+  function toggleFeel(f){setFeel(feel.indexOf(f)>=0?feel.filter(function(x){return x!==f}):feel.concat([f]))}
+  function toggleCov(id){setCovered(cov.indexOf(id)>=0?cov.filter(function(x){return x!==id}):cov.concat([id]))}
+  function addPending(){var t=draft.trim();if(t&&addBlock){setPending(pending.concat([{block:addBlock,text:t}]));setDraft('')}}
+  var ops=props.ops;
+  function addTo(key,t){var nid=ops.addLine(person.id,key,t);setAdded(function(a){return {lines:a.lines.concat([nid]),rels:a.rels}})}
+  var blocksFor=function(key){return person.lines.filter(function(l){return l.block===key})};
+  var relLines=person.rels.map(function(f){return {id:f.id,text:f.name+(f.relation?', '+f.relation:'')}});
+  function lineBlock(title,key){return h(Block,{key:key,title:title,lines:blocksFor(key),onAdd:function(t){addTo(key,t)},onSave:function(id,t){ops.saveLine(person.id,id,t)},onDelete:function(id){ops.delLine(person.id,id)}})}
+  var main;
+  if(picking){
+    main=h(Sheet,{title:'Who did you talk to?',onClose:props.onClose},
+      h(Picker,{rows:props.rows,suggestedId:props.suggestedId,onBack:function(){setPicking(false)},onPick:function(id){setPid(id);setCovered(null);setPending([]);setAdded({lines:[],rels:[]});setPicking(false)}}));
+  }else{
+    main=h(Sheet,{title:'Log a chat',onClose:props.onClose,footer:div(null,
+      para({className:'small muted',style:{margin:'0 0 8px',textAlign:'center'}},ready?'Saving resets '+person.name+"'s contact clock":'Pick a type and a depth to save'),
+      button({className:'btn primary full',disabled:!ready,onClick:function(){props.onSave({pid:person.id,at:stamp,type:type,length:length,depth:depth,duration:Number(dur)||0,feelings:feel,covered:cov,pending:[],added:added,note:note.trim()})}},'Save chat'))},
+    div({className:'row',style:{margin:'4px 0 8px'}},h(Avatar,{name:person.name,size:40}),
+      div({style:{flex:1,minWidth:0}},div({style:{fontWeight:600}},person.name),div({className:'muted small'},prow?'Last talked '+agoText(prow.days):'')),
+      button({className:'linkbtn',onClick:function(){setPicking(true)}},'Change')),
+    label({className:'lbl'},'When'),h(Seg,{label:'When',value:when,onChange:setWhen,options:[['now','Just now'],['yesterday','Yesterday'],['date','Other day']]}),
+    when==='date'?input({className:'field',style:{marginTop:8},type:'date',max:ymd(USER_TZ,now),'aria-label':'Date',value:wdate,onChange:function(e){setWdate(e.target.value)}}):null,
+    when!=='now'&&ready?para({className:'small muted',style:{margin:'6px 0 0'}},'Saved as '+fmtDate(stamp,now)):null,
+    label({className:'lbl'},'Type'),h(Seg,{label:'Type',value:type,onChange:setType,options:[['person','In person'],['call','Call'],['text','Text']]}),
+    label({className:'lbl',htmlFor:'log-dur'},'How long'),h(DurSlider,{id:'log-dur',value:dur,onChange:setDur}),
+    label({className:'lbl'},'How deep'),h(Seg,{label:'How deep',value:depth,onChange:setDepth,options:[['shallow','Shallow'],['varied','Varied'],['deep','Deep']]}),
+    label({className:'lbl'},'How they were feeling (optional)'),
+    div({className:'chips'},['Happy','Excited','Calm','Tired','Stressed','Sad'].map(function(f){return button({key:f,type:'button',className:'chip','aria-pressed':feel.indexOf(f)>=0,onClick:function(){toggleFeel(f)}},f)})),
+    offers.length?div(null,label({className:'lbl'},'Covered from Next time'),offers.map(function(l){
+      return label({key:l.id,className:'check'},input({type:'checkbox',checked:cov.indexOf(l.id)>=0,onChange:function(){toggleCov(l.id)}}),span(null,l.text));
+    })):null,
+    label({className:'lbl',htmlFor:'log-note'},'What was it about? (optional)'),
+    h('textarea',{id:'log-note',className:'field',rows:3,style:{height:'auto',minHeight:84,padding:'10px 14px',resize:'vertical',lineHeight:1.4,fontFamily:'inherit',fontSize:'inherit'},placeholder:'What you talked about or did',value:note,onChange:function(e){setNote(e.target.value)}}),
+    label({className:'lbl'},'Their profile'),
+    para({className:'small muted',style:{margin:'0 0 8px'}},'Add, edit or remove anything you learned. Changes save right away.'),
+    h(Block,{title:'Next time',next:true,lines:blocksFor('next_time'),onAdd:function(t){addTo('next_time',t)},onSave:function(id,t){ops.saveLine(person.id,id,t)},onDelete:function(id){ops.delLine(person.id,id)},onToggle:function(id){ops.toggle(person.id,id)}}),
+    div({className:'grid2',style:{marginTop:12}},
+      h(Block,{title:'Their people',lines:relLines,onAddRequest:function(){setRelOpen({rid:null})},onTapLine:function(id){setRelOpen({rid:id})},onAdd:function(){},onSave:function(){},onDelete:function(id){ops.delRel(person.id,id)}}),
+      lineBlock('Interests','interests'),lineBlock('About','about'),
+      (props.custom||[]).map(function(c){return lineBlock(c.name,'c_'+c.key)})));
+  }
+  var relSheet=relOpen?h(RelSheet,{key:relOpen.rid||'new',top:true,member:relOpen.rid?person.rels.find(function(f){return f.id===relOpen.rid}):null,existing:person.rels,
+    onClose:function(){setRelOpen(null)},
+    onPick:function(m){setRelOpen({rid:m.id})},
+    onSave:function(m){
+      if(!relOpen.rid)setAdded(function(a){return {lines:a.lines,rels:a.rels.concat([m.id])}});
+      props.onPutRel(person.id,m);
+      setRelOpen(null);
+    },
+    onDelete:function(fid){ops.delRel(person.id,fid);setRelOpen(null)}}):null;
+  return h(React.Fragment,null,main,relSheet);
+}
+
+/* ---------- add person ---------- */
+function AddSheet(props){
+  var _a=useState(''),name=_a[0],setName=_a[1];
+  var _b=useState('friends'),group=_b[0],setGroup=_b[1];
+  var _c=useState('text'),ctype=_c[0],setCtype=_c[1];
+  var _d=useState(''),cval=_d[0],setCval=_d[1];
+  var _e=useState(''),q=_e[0],setQ=_e[1];
+  var _f=useState(null),city=_f[0],setCity=_f[1];
+  var _g=useState(null),est=_g[0],setEst=_g[1];
+  var matches=q.trim()?CITIES.filter(function(c){return c[0].toLowerCase().indexOf(q.trim().toLowerCase())>=0}).slice(0,4):[];
+  var ready=name.trim()&&city;
+  function build(){return {name:name.trim(),group:group,tz:city[1],contact:{type:ctype,value:cval.trim()},estimate:est==null?180:est}}
+  function reset(){setName('');setCval('');setQ('');setCity(null);setEst(null)}
+  return h(Sheet,{title:'Add a person',onClose:props.onClose,footer:div({className:'row'},
+      button({className:'btn sm',style:{flex:1},disabled:!ready,onClick:function(){props.onCreate(build(),true);reset()}},'Create and add more'),
+      button({className:'btn primary',style:{flex:1},disabled:!ready,onClick:function(){props.onCreate(build(),false)}},'Create and view'))},
+    label({className:'lbl',htmlFor:'add-name'},'Name'),
+    input({id:'add-name',className:'field',autoFocus:true,value:name,onChange:function(e){setName(e.target.value)},placeholder:'First name'}),
+    label({className:'lbl'},'Group'),
+    div({className:'chips'},GROUPS.map(function(g){return button({key:g.id,type:'button',className:'chip','aria-pressed':group===g.id,onClick:function(){setGroup(g.id)}},g.name+' · '+props.tune.groupInterval[g.id]+'d')})),
+    label({className:'lbl'},'How you reach them'),
+    div({className:'row'},div({style:{width:150,flex:'none'}},h(Seg,{label:'Contact method',value:ctype,onChange:setCtype,options:[['text','Text'],['call','Call']]})),
+      input({id:'add-contact',className:'field','aria-label':'Number or handle',value:cval,onChange:function(e){setCval(e.target.value)},placeholder:'Number or handle'})),
+    label({className:'lbl',htmlFor:'add-city'},'Where they are'),
+    city?div({className:'row'},div({className:'card',style:{flex:1,padding:'10px 14px'}},span({style:{fontWeight:600}},city[0]),span({className:'muted'},' · '+clockStr(city[1],props.now)+' there')),button({className:'linkbtn',onClick:function(){setCity(null)}},'Change'))
+    :div(null,input({id:'add-city',className:'field',value:q,onChange:function(e){setQ(e.target.value)},placeholder:'Search a city, such as Lisbon'}),
+      matches.map(function(c){return button({key:c[1],type:'button',className:'btn sm full',style:{marginTop:6,textAlign:'left'},onClick:function(){setCity(c)}},c[0]+' · '+clockStr(c[1],props.now)+' there')})),
+    label({className:'lbl'},'Roughly when did you last talk?'),
+    div({className:'chips'},LAST_TALKED.map(function(x){return button({key:x[0],type:'button',className:'chip','aria-pressed':est===x[1],onClick:function(){setEst(est===x[1]?null:x[1])}},x[0])})));
+}
+
+/* ---------- their people card ---------- */
+function RelSheet(props){
+  var f=props.member||{id:null,name:'',relation:'',birthday:'',notes:[]};
+  var _a=useState(f.name),name=_a[0],setName=_a[1];
+  var _b=useState(f.relation),rel=_b[0],setRel=_b[1];
+  var _c=useState(f.birthday?'2000-'+f.birthday:''),bday=_c[0],setBday=_c[1];
+  var _d=useState(f.notes||[]),notes=_d[0],setNotes=_d[1];
+  var q=name.trim().toLowerCase();
+  var matches=(!f.id&&q.length>=2)?(props.existing||[]).filter(function(x){return x.name.toLowerCase().indexOf(q)>=0}).slice(0,3):[];
+  return h(Sheet,{title:f.id?f.name:'Add to their people',top:props.top,onClose:props.onClose,footer:div({className:'row'},
+      (f.id&&props.onDelete)?button({className:'btn danger',onClick:function(){props.onDelete(f.id)}},'Delete'):null,
+      button({className:'btn primary',style:{flex:1},disabled:!name.trim(),onClick:function(){props.onSave({id:f.id||uid(),name:name.trim(),relation:rel.trim(),birthday:bday?bday.slice(5):'',notes:notes})}},'Save'))},
+    label({className:'lbl',htmlFor:'rel-name'},'Name'),input({id:'rel-name',className:'field',autoFocus:!f.id,value:name,onChange:function(e){setName(e.target.value)}}),
+    matches.length?div({style:{marginTop:8}},para({className:'small muted',style:{margin:'0 0 4px'}},'Already in their people. Tap to add a note instead:'),
+      div({className:'chips'},matches.map(function(m){return button({key:m.id,type:'button',className:'chip',onClick:function(){props.onPick(m)}},m.name+(m.relation?' · '+m.relation:''))}))):null,
+    label({className:'lbl',htmlFor:'rel-rel'},'How they are connected'),input({id:'rel-rel',className:'field',value:rel,placeholder:'mother, brother, partner, best friend',onChange:function(e){setRel(e.target.value)}}),
+    label({className:'lbl',htmlFor:'rel-bd'},'Birthday'),input({id:'rel-bd',className:'field',type:'date',value:bday,onChange:function(e){setBday(e.target.value)}}),
+    div({style:{marginTop:14}},h(Block,{title:'Notes',wide:true,lines:notes,
+      onAdd:function(t){setNotes(notes.concat([{id:uid(),text:t}]))},
+      onSave:function(id,t){setNotes(notes.map(function(n){return n.id===id?{id:id,text:t}:n}))},
+      onDelete:function(id){setNotes(notes.filter(function(n){return n.id!==id}))}})));
+}
+
+/* ---------- chat detail ---------- */
+function ChatSheet(props){
+  var p=props.person,c=props.chat,now=props.now;
+  var covered=p.lines.filter(function(l){return l.chatId===c.id});
+  var learned=p.lines.filter(function(l){return l.addedIn===c.id});
+  var folks=p.rels.filter(function(f){return f.addedIn===c.id});
+  var names={interests:'Interests',about:'About',next_time:'Added to Next time'};
+  (props.custom||[]).forEach(function(x){names['c_'+x.key]=x.name});
+  var keys=[];learned.forEach(function(l){if(keys.indexOf(l.block)<0)keys.push(l.block)});
+  function group(title,items){
+    return div({key:title},label({className:'lbl'},title),div({className:'card',style:{padding:'0 16px'}},items.map(function(t,i){
+      return div({key:i,style:{padding:'12px 0',borderTop:i?'1px solid var(--line)':'0'}},t)})));
+  }
+  var empty=!covered.length&&!learned.length&&!folks.length;
+  return h(Sheet,{title:fmtDate(c.at,now),onClose:props.onClose},
+    para({className:'muted',style:{margin:'0 0 4px'}},TYPE_LABEL[c.type]+' · '+LEN_LABEL[c.length]+' · '+DEPTH_LABEL[c.depth]+(c.duration?' · '+c.duration+' min':'')),
+    c.feelings&&c.feelings.length?para({className:'small muted',style:{margin:0}},'Feeling '+c.feelings.join(', ')):null,
+    c.note?div(null,label({className:'lbl'},'What it was about'),div({className:'card',style:{padding:'12px 16px'}},para({style:{margin:0,whiteSpace:'pre-wrap'}},c.note))):null,
+    empty&&!c.note?para({className:'muted',style:{margin:'16px 0 0'}},'Nothing was recorded from this chat.'):null,
+    covered.length?group('Covered from Next time',covered.map(function(l){return l.text})):null,
+    folks.length?group('New in their people',folks.map(function(f){return f.name+(f.relation?', '+f.relation:'')})):null,
+    keys.map(function(k){return group(names[k]||'Other',learned.filter(function(l){return l.block===k}).map(function(l){return l.text}))}));
+}
+
+/* ---------- edit person ---------- */
+function EditPersonSheet(props){
+  var p=props.person;
+  var _n=useState(p.name),name=_n[0],setName=_n[1];
+  var _g=useState(p.group),group=_g[0],setGroup=_g[1];
+  var _t=useState(p.contact.type),ctype=_t[0],setCtype=_t[1];
+  var _v=useState(p.contact.value||''),cval=_v[0],setCval=_v[1];
+  var _z=useState(p.tz),tz=_z[0],setTz=_z[1];
+  var _q=useState(''),q=_q[0],setQ=_q[1];
+  var _c=useState(false),changing=_c[0],setChanging=_c[1];
+  var _b=useState(p.birthday?'2000-'+p.birthday:''),bday=_b[0],setBday=_b[1];
+  var _i=useState(p.intervalOverride?String(p.intervalOverride):''),iv=_i[0],setIv=_i[1];
+  var _h=useState(p.hometown||''),home=_h[0],setHome=_h[1];
+  var _s=useState(p.socials||''),soc=_s[0],setSoc=_s[1];
+  var _d=useState(false),confirmDel=_d[0],setConfirmDel=_d[1];
+  var matches=q.trim()?CITIES.filter(function(c){return c[0].toLowerCase().indexOf(q.trim().toLowerCase())>=0}).slice(0,4):[];
+  var city=(CITIES.find(function(c){return c[1]===tz})||[cityOf(tz)])[0];
+  function save(){props.onSave({name:name.trim(),group:group,tz:tz,contact:{type:ctype,value:cval.trim()},birthday:bday?bday.slice(5):'',intervalOverride:Number(iv)||0,hometown:home.trim(),socials:soc.trim()})}
+  return h(Sheet,{title:'Edit '+p.name,onClose:props.onClose,footer:button({className:'btn primary full',disabled:!name.trim(),onClick:save},'Save changes')},
+    label({className:'lbl',htmlFor:'ep-name'},'Name'),input({id:'ep-name',className:'field',value:name,onChange:function(e){setName(e.target.value)}}),
+    label({className:'lbl'},'Group'),
+    div({className:'chips'},GROUPS.map(function(g){return button({key:g.id,type:'button',className:'chip','aria-pressed':group===g.id,onClick:function(){setGroup(g.id)}},g.name+' · '+props.tune.groupInterval[g.id]+'d')})),
+    label({className:'lbl',htmlFor:'ep-contact'},'How you reach them'),
+    div({className:'row'},div({style:{width:150,flex:'none'}},h(Seg,{label:'Contact method',value:ctype,onChange:setCtype,options:[['text','Text'],['call','Call']]})),
+      input({id:'ep-contact',className:'field','aria-label':'Number or handle',value:cval,onChange:function(e){setCval(e.target.value)},placeholder:'Number or handle'})),
+    label({className:'lbl',htmlFor:'ep-city'},'Where they are'),
+    !changing?div({className:'row'},div({className:'card',style:{flex:1,padding:'10px 14px'}},span({style:{fontWeight:600}},city),span({className:'muted'},' · '+clockStr(tz,props.now)+' there')),button({className:'linkbtn',onClick:function(){setChanging(true)}},'Change'))
+    :div(null,input({id:'ep-city',className:'field',autoFocus:true,value:q,onChange:function(e){setQ(e.target.value)},placeholder:'Search a city, such as Lisbon'}),
+      matches.map(function(c){return button({key:c[1],type:'button',className:'btn sm full',style:{marginTop:6,textAlign:'left'},onClick:function(){setTz(c[1]);setChanging(false);setQ('')}},c[0]+' · '+clockStr(c[1],props.now)+' there')}),
+      button({className:'linkbtn',onClick:function(){setChanging(false);setQ('')}},'Keep '+city)),
+    label({className:'lbl',htmlFor:'ep-bd'},'Birthday'),input({id:'ep-bd',className:'field',type:'date',value:bday,onChange:function(e){setBday(e.target.value)}}),
+    label({className:'lbl',htmlFor:'ep-iv'},'Contact interval in days (blank uses the group)'),input({id:'ep-iv',className:'field',type:'number',min:1,inputMode:'numeric',value:iv,placeholder:'Every '+props.tune.groupInterval[group]+' days',onChange:function(e){setIv(e.target.value)}}),
+    label({className:'lbl',htmlFor:'ep-home'},'Hometown'),input({id:'ep-home',className:'field',value:home,onChange:function(e){setHome(e.target.value)}}),
+    label({className:'lbl',htmlFor:'ep-soc'},'Socials'),input({id:'ep-soc',className:'field',value:soc,onChange:function(e){setSoc(e.target.value)}}),
+    div({className:'divider',style:{marginTop:22}}),
+    label({className:'lbl',style:{marginTop:0}},'Manage'),
+    !p.archived?div(null,
+      button({className:'btn full',onClick:props.onArchive},'Archive '+p.name),
+      para({className:'small muted',style:{margin:'8px 0 0'}},'Hides them from suggestions and the People list. Everything is kept, and you can restore them from People at any time.'))
+    :div(null,
+      button({className:'btn primary full',onClick:props.onRestore},'Restore '+p.name),
+      !confirmDel?button({className:'btn danger full',style:{marginTop:8},onClick:function(){setConfirmDel(true)}},'Delete forever')
+      :div({className:'card',style:{marginTop:8,borderColor:'var(--danger)'}},
+        para({style:{margin:'0 0 10px'}},'This removes '+p.name+', their notes, chats and people for good. It cannot be undone.'),
+        div({className:'row'},button({className:'btn',style:{flex:1},onClick:function(){setConfirmDel(false)}},'Cancel'),button({className:'btn danger',style:{flex:1},onClick:props.onDelete},'Delete forever')))));
+}
+
+/* ---------- reach sheet ---------- */
+function ReachSheet(props){
+  var p=props.person,pref=p.contact.type==='call'?'call':'text';
+  return h(Sheet,{title:'Reach '+p.name,onClose:props.onClose},
+    para({className:'muted',style:{margin:'0 0 12px'}},p.contact.value||'No number saved yet'),
+    div({className:'row'},
+      button({className:'btn'+(pref==='call'?' primary':''),style:{flex:1},onClick:function(){props.onGo(p,'call')}},'Call'),
+      button({className:'btn'+(pref==='text'?' primary':''),style:{flex:1},onClick:function(){props.onGo(p,'text')}},'Message')),
+    para({className:'small muted',style:{margin:'12px 0 0'}},'This opens your phone or messages. Come back and tap Log when you have talked.'));
+}
+
+/* ---------- tuning panel ---------- */
+function Num(props){
+  return div(null,label({htmlFor:props.id},props.label),input({id:props.id,type:'number',step:props.step||1,min:props.min==null?0:props.min,max:props.max,value:props.value,
+    onChange:function(e){var n=Number(e.target.value);props.onChange(isFinite(n)?n:props.value)}}));
+}
+function Tune(props){
+  var t=props.tune,set=props.setTune,rows=props.rows,heroId=props.heroId,now=props.now;
+  return div(null,
+    h2(null,'Prototype controls'),
+    para({className:'small muted',style:{margin:'0 0 8px'}},'Sample people and numbers. Nothing here leaves your browser.'),
+    h3(null,'Try this'),
+    ol({className:'try'},
+      li(null,'Tap any line to edit it. Swipe it left to delete; there is an Undo.'),
+      li(null,'Slide the time bar (Any, 15, 30, 60+): it nudges the order, and a very overdue person can still win.'),
+      li(null,'Tap a chat under Recent chats to see what was new from it. Tap Edit on a profile to change their details or archive them.'),
+      li(null,'Lena was logged just now, so she never appears today. Priya is not due yet.'),
+      li(null,'Move the clock forward 6 hours: Home moves on when someone falls asleep.'),
+      li(null,'Tap Contact, pick Call, and Home asks if you got to talk. Log it opens with that person.'),
+      li(null,'Log a chat and see that person drop down the list.'),
+      li(null,'Change an interval or length below and watch who is picked.')),
+    h3(null,'Clock'),
+    para({className:'small',style:{margin:'0 0 8px'}},new Date(now).toLocaleString('en-US',{timeZone:USER_TZ,weekday:'short',hour:'numeric',minute:'2-digit',month:'short',day:'numeric'})+' ('+cityOf(USER_TZ)+')'+(props.shift?' · shifted':'')),
+    div({className:'chips'},
+      button({className:'chip',onClick:function(){props.addShift(3600000)}},'+1 hour'),
+      button({className:'chip',onClick:function(){props.addShift(6*3600000)}},'+6 hours'),
+      button({className:'chip',onClick:function(){props.addShift(DAY)}},'+1 day'),
+      button({className:'chip',onClick:function(){props.addShift(0)}},'Back to now')),
+    h3(null,'Intervals (days)'),
+    div({className:'numgrid'},GROUPS.map(function(g){return h(Num,{key:g.id,id:'t-iv-'+g.id,label:g.name,value:t.groupInterval[g.id],min:1,onChange:function(v){set(['groupInterval',g.id],v)}})})),
+    h3(null,'Minutes per chat length'),
+    div({className:'numgrid'},[['quick','Quick'],['catchup','Catch-up'],['long','Long']].map(function(x){return h(Num,{key:x[0],id:'t-len-'+x[0],label:x[1],value:t.lenMin[x[0]],min:1,onChange:function(v){set(['lenMin',x[0]],v)}})})),
+    h3(null,'Awake window and snooze'),
+    div({className:'numgrid'},
+      h(Num,{id:'t-as',label:'Awake from (hour)',value:t.awakeStart,min:0,max:23,onChange:function(v){set(['awakeStart'],v)}}),
+      h(Num,{id:'t-ae',label:'Awake until (hour)',value:t.awakeEnd,min:1,max:24,onChange:function(v){set(['awakeEnd'],v)}}),
+      h(Num,{id:'t-sn',label:'Snooze (days)',value:t.snoozeDays,min:1,onChange:function(v){set(['snoozeDays'],v)}})),
+    h3(null,'Due floor and time chips'),
+    div({className:'numgrid'},
+      h(Num,{id:'t-df',label:'Not due below (x interval)',value:t.dueFloor,step:0.05,onChange:function(v){set(['dueFloor'],v)}}),
+      h(Num,{id:'t-cp',label:'Chip miss weight',value:t.chipPenalty,step:0.05,onChange:function(v){set(['chipPenalty'],v)}}),
+      h(Num,{id:'t-c15',label:'15 min: up to',value:t.chip15Max,onChange:function(v){set(['chip15Max'],v)}}),
+      h(Num,{id:'t-c30',label:'30+: from',value:t.chip30Min,onChange:function(v){set(['chip30Min'],v)}}),
+      h(Num,{id:'t-cl',label:'Long: from',value:t.chipLongMin,onChange:function(v){set(['chipLongMin'],v)}})),
+    h3(null,'Chat length guess'),
+    div({className:'numgrid'},
+      h(Num,{id:'t-gb',label:'Max gap boost (x)',value:t.gapBoost,step:0.1,min:1,onChange:function(v){set(['gapBoost'],v)}}),
+      h(Num,{id:'t-gr',label:'Boost peaks at (x interval)',value:t.gapRatio,step:0.5,min:1.5,onChange:function(v){set(['gapRatio'],v)}}),
+      h(Num,{id:'t-tc',label:'Trust history at (chats)',value:t.trustChats,min:1,onChange:function(v){set(['trustChats'],v)}}),
+      h(Num,{id:'t-hd',label:'History damps boost',value:t.historyDamp,step:0.05,max:1,onChange:function(v){set(['historyDamp'],v)}}),
+      h(Num,{id:'t-ec',label:'Never guess above (min)',value:t.expCap,min:15,onChange:function(v){set(['expCap'],v)}}),
+      h(Num,{id:'t-ln',label:'Chats averaged',value:t.lastN,min:1,onChange:function(v){set(['lastN'],v)}})),
+    h3(null,'Who ranks where'),
+    div({className:'tw'},table({className:'rank'},
+      thead(null,tr(null,th(null,'Person'),th(null,'Their time'),th(null,'Days'),th(null,'Every'),th(null,'Ratio'),th(null,'Guess'),props.chip?th(null,'Fits'):null,th(null,'Status'))),
+      tbody(null,rows.map(function(r){
+        var st=r.p.id===heroId?'Shown':r.status==='ok'?'Eligible':STATUS_LABEL[r.status]||r.status;
+        return tr({key:r.p.id,className:r.p.id===heroId?'hero':''},td(null,r.p.name),td(null,clockStr(r.p.tz,now)),td(null,Math.floor(r.days)),td(null,r.iv),td(null,r.ratio.toFixed(2)),td(null,(r.sure?'':'~')+r.exp+' min'),props.chip?td(null,chipFits(props.chip,r.exp,t)?'Yes':'No'):null,td(null,st));
+      })))),
+    div({className:'row',style:{marginTop:16,flexWrap:'wrap'}},
+      button({className:'btn sm',onClick:props.resetTune},'Reset numbers'),
+      button({className:'btn sm',onClick:props.resetAll},'Reset sample data')));
+}
+
+/* ---------- screens ---------- */
+function Actions(props){
+  var p=props.p,a=props.a;
+  var snoozeText='Snooze '+a.tune.snoozeDays+' days';
+  return div({style:{marginTop:14}},
+    button({className:'btn primary full',onClick:function(){a.onContact(p)}},'Contact'),
+    button({className:'btn full',style:{marginTop:8},onClick:function(){a.onLog(p.id)}},'Log'),
+    div({className:'row',style:{marginTop:6,justifyContent:'center',gap:4}},
+      button({className:'linkbtn',style:{color:'var(--muted)',fontWeight:500},onClick:function(){a.onSkip(p)}},'Not today'),
+      span({className:'muted','aria-hidden':'true'},'\u00B7'),
+      button({className:'linkbtn',style:{color:'var(--muted)',fontWeight:500},onClick:function(){a.onSnooze(p)}},snoozeText)));
+}
+function Home(a){
+  var hero=a.hero,r=hero?hero.row:null;
+  var dates=upcoming(a.people,a.now,14).slice(0,3);
+  var body;
+  if(!r){
+    var asleep=a.rows.filter(function(x){return x.status==='asleep'}).map(function(x){return {x:x,m:wakeInMin(x.p,a.now,a.tune)}}).sort(function(p,q){return p.m-q.m})[0];
+    var calm=a.rows.some(function(x){return x.status==='notdue'||x.status==='today'});
+    body=div({className:'card'},para({className:'eyebrow'},'Up next'),
+      div({className:'name',style:{fontSize:22}},asleep?'Nobody is free right now':calm?"You're caught up":'Nobody to suggest'),
+      para({className:'muted',style:{margin:'6px 0 0'}},asleep?asleep.x.p.name+' wakes in about '+(asleep.m>=60?Math.round(asleep.m/60)+' hours':asleep.m+' minutes')+'.':calm?'Nobody is due right now. Enjoy the quiet, or browse everyone.':'Everyone is snoozed or skipped for today.'),
+      button({className:'linkbtn',onClick:a.onPeople},'Browse everyone'));
+  }else{
+    var p=r.p,lines=p.lines.filter(function(l){return l.block==='next_time'&&!l.chatId});
+    body=div({className:'card'},
+      div({className:'row'},h(Avatar,{name:p.name,size:56}),
+        div({style:{minWidth:0}},div({className:'row',style:{gap:8}},
+          button({className:'name',style:{border:0,background:'transparent',padding:0,fontSize:24,textAlign:'left'},onClick:function(){a.onOpen(p.id)}},p.name),
+          span({className:'tag'},(GROUPS.find(function(g){return g.id===p.group})||{}).name)),
+          div({className:'muted small'},clockStr(p.tz,a.now)+' there, likely free'))),
+      para({style:{margin:'14px 0 0',fontWeight:500}},whyLine(r)),
+      div({className:'divider'}),
+      para({className:'eyebrow'},'Next time'),
+      lines.length?lines.slice(0,3).map(function(l){return label({key:l.id,className:'check'},input({type:'checkbox',checked:!!l.done,onChange:function(){a.onToggle(p.id,l.id)}}),span({className:l.done?'done':''},l.text))}):para({className:'muted small',style:{margin:'0 0 4px'}},'Nothing saved yet. Add things to ask or mention on their profile.'),
+      lines.length>3?para({className:'small muted',style:{margin:'0 0 4px'}},'+ '+(lines.length-3)+' more on their profile'):null,
+      h(Actions,{p:p,a:a}));
+  }
+  var nudge=a.reachP?div({className:'strip',style:{padding:'12px 16px',marginBottom:12}},
+    para({style:{margin:'0 0 8px',fontWeight:500}},'Did you get to talk to '+a.reachP.name+'?'),
+    div({className:'row'},
+      button({className:'btn primary sm',style:{flex:1},onClick:function(){a.onLog(a.reachP.id)}},'Log it'),
+      button({className:'btn sm',style:{flex:1},onClick:a.onDismissReach},'Not yet'))):null;
+  return div(null,
+    nudge,
+    body,
+    div({style:{marginTop:18}},para({className:'eyebrow'},'How much time do you have?'),
+      h(Snap,{label:'Time available',options:CHIP_OPTS,index:Math.max(0,CHIP_OPTS.findIndex(function(o){return o[0]===(a.chip||'')})),valueText:function(i){return ['Any amount of time','About 15 minutes','About 30 minutes','An hour or more'][i]},onChange:function(k){a.onChip(CHIP_OPTS[k][0]||null)}}),
+      hero&&hero.note?para({className:'small muted',style:{margin:'8px 0 0'}},hero.note):null),
+    div({style:{marginTop:18}},para({className:'eyebrow'},'Coming up'),
+      dates.length?div({className:'strip'},dates.map(function(d,i){return div({key:i,className:'row'},span(null,d.label),span({className:'muted small'},d.days===0?'Today':dateLabel(d.at))) })):para({className:'muted small',style:{margin:0}},'Nothing in the next two weeks.')));
+}
+function People(a){
+  var _a=useState(''),q=_a[0],setQ=_a[1];
+  var _ar=useState(false),showArch=_ar[0],setShowArch=_ar[1];
+  var arch=(a.archived||[]).filter(function(p){return !q.trim()||p.name.toLowerCase().indexOf(q.trim().toLowerCase())>=0});
+  var rows=a.rows.filter(function(r){return !q.trim()||r.p.name.toLowerCase().indexOf(q.trim().toLowerCase())>=0});
+  return div(null,
+    div({className:'row',style:{marginBottom:10}},input({id:'people-search',className:'field','aria-label':'Search people',placeholder:'Search people',value:q,onChange:function(e){setQ(e.target.value)}}),
+      button({className:'btn primary',style:{flex:'none'},onClick:a.onAdd},'Add')),
+    GROUPS.map(function(g){
+      var rs=rows.filter(function(r){return r.p.group===g.id}).sort(function(x,y){return y.days-x.days});
+      if(!rs.length)return null;
+      return div({key:g.id,style:{marginBottom:14}},para({className:'eyebrow'},g.name+' · every '+a.tune.groupInterval[g.id]+' days'),
+        div({className:'card list',style:{padding:'0 16px'}},rs.map(function(r){
+          return button({key:r.p.id,className:'row',onClick:function(){a.onOpen(r.p.id)}},h(Avatar,{name:r.p.name,size:40}),
+            div({style:{flex:1,minWidth:0}},div({style:{fontWeight:600}},r.p.name),div({className:'muted small'},'Last talked '+agoText(r.days)+' · '+clockStr(r.p.tz,a.now)+' there')),
+            r.status!=='ok'?span({className:'tag'},STATUS_LABEL[r.status]||r.status):null);
+        })));
+    }),
+    arch.length?div({style:{marginTop:6}},
+      button({className:'linkbtn',style:{color:'var(--muted)'},'aria-expanded':showArch,onClick:function(){setShowArch(!showArch)}},'Archived ('+arch.length+') '+(showArch?'\u25B4':'\u25BE')),
+      showArch?div({className:'card list',style:{padding:'0 16px'}},arch.map(function(p){
+        return button({key:p.id,className:'row',onClick:function(){a.onOpen(p.id)}},h(Avatar,{name:p.name,size:40}),div({style:{flex:1,minWidth:0}},div({style:{fontWeight:600}},p.name),div({className:'muted small'},'Archived')))})):null):null,
+    !rows.length&&!arch.length?div({className:'empty'},'No one matches that search.'):null);
+}
+function Dates(a){
+  var list=upcoming(a.people,a.now,365);
+  return div(null,list.length?div({className:'card list',style:{padding:'0 16px'}},list.map(function(d,i){
+    return button({key:i,className:'row',onClick:function(){a.onOpen(d.pid)}},div({style:{flex:1}},div({style:{fontWeight:600}},d.label),d.sub?div({className:'muted small'},d.sub):null),span({className:'muted small'},d.days===0?'Today':dateLabel(d.at)));
+  })):div({className:'empty'},'No birthdays saved yet. Add them on a profile.'));
+}
+function Profile(a){
+  var p=a.person,now=a.now,tune=a.tune,ops=a.ops;
+  var _a=useState(false),more=_a[0],setMore=_a[1];
+  var _b=useState(false),allChats=_b[0],setAllChats=_b[1];
+  var _c=useState(false),addSec=_c[0],setAddSec=_c[1];
+  var iv=intervalOf(p,tune),lp=lastChatAt(p,'person'),lc=Math.max(lastChatAt(p,'call'),lastChatAt(p,'text'));
+  var chats=p.chats.slice().sort(function(x,y){return y.at-x.at});
+  var blocksFor=function(key){return p.lines.filter(function(l){return l.block===key})};
+  function field(id,lbl,val,onChange,props2){return div(null,label({className:'lbl',htmlFor:id},lbl),input(Object.assign({id:id,className:'field',value:val,onChange:function(e){onChange(e.target.value)}},props2||{})))}
+  function fact(l,v){return div({className:'fact'},div({className:'fl'},l),div({className:'fv'},v))}
+  var relLines=p.rels.map(function(f){return {id:f.id,text:f.name+(f.relation?', '+f.relation:'')}});
+  return div(null,
+    div({className:'row',style:{justifyContent:'space-between'}},
+      button({className:'linkbtn',style:{display:'flex',alignItems:'center'},onClick:a.onBack},h(Icon,{n:'back',s:20,w:2}),' '+a.backLabel),
+      button({className:'linkbtn',onClick:function(){a.onEdit(p.id)}},'Edit')),
+    p.archived?div({className:'strip',style:{padding:'10px 16px',marginTop:6}},div({className:'row'},span({className:'small'},'Archived. Not suggested on Home.'),button({className:'linkbtn',style:{marginLeft:'auto'},onClick:function(){ops.restore(p.id)}},'Restore'))):null,
+    div({className:'row',style:{marginTop:4}},h(Avatar,{name:p.name,size:72}),
+      div({style:{minWidth:0}},div({className:'name',style:{fontSize:27,lineHeight:'30px'}},p.name),
+        div({className:'row',style:{gap:8,marginTop:6}},span({className:'tag'},(GROUPS.find(function(g){return g.id===p.group})||{}).name),span({className:'small muted'},clockStr(p.tz,now)+' there')))),
+    div({className:'row',style:{marginTop:14}},
+      button({className:'btn primary',style:{flex:1.3},onClick:function(){a.onContact(p)}},'Contact'),
+      button({className:'btn',style:{flex:1},onClick:function(){a.onLog(p.id)}},'Log')),
+    div({className:'card',style:{marginTop:14,padding:'14px 16px 0'}},
+      div({className:'grid2',style:{rowGap:10}},
+        fact('Birthday',p.birthday?dateLabel(Date.UTC(2000,+p.birthday.slice(0,2)-1,+p.birthday.slice(3))).replace(/^\w+, /,''):'Not added'),
+        fact('Interval','Every '+iv+' days'),
+        fact('Timezone',cityOf(p.tz)),
+        fact('Prefers',p.contact.type==='call'?'Call':'Text'),
+        fact('Last in person',lp?fmtDate(lp,now):'None yet'),
+        fact('Last call or text',lc?fmtDate(lc,now):'None yet')),
+      more?div({className:'grid2',style:{rowGap:10,padding:'4px 0 12px'}},
+        fact('Number or handle',p.contact.value||'Not added'),
+        fact('Hometown',p.hometown||'Not added'),
+        fact('Socials',p.socials||'Not added')):null,
+      button({className:'linkbtn',style:{width:'100%',borderTop:'1px solid var(--line)',marginTop:8},onClick:function(){setMore(!more)}},more?'Fewer details':'More details')),
+    div({style:{marginTop:14}},h(Block,{title:'Next time',next:true,lines:blocksFor('next_time'),onAdd:function(t){ops.addLine(p.id,'next_time',t)},onSave:function(id,t){ops.saveLine(p.id,id,t)},onDelete:function(id){ops.delLine(p.id,id)},onToggle:function(id){ops.toggle(p.id,id)}})),
+    div({className:'grid2',style:{marginTop:12}},
+      h(Block,{title:'Their people',lines:relLines,onAddRequest:function(){a.onRel(p.id,null)},onTapLine:function(id){a.onRel(p.id,id)},onAdd:function(){},onSave:function(){},onDelete:function(id){ops.delRel(p.id,id)}}),
+      h(Block,{title:'Interests',lines:blocksFor('interests'),onAdd:function(t){ops.addLine(p.id,'interests',t)},onSave:function(id,t){ops.saveLine(p.id,id,t)},onDelete:function(id){ops.delLine(p.id,id)}}),
+      h(Block,{title:'About',lines:blocksFor('about'),onAdd:function(t){ops.addLine(p.id,'about',t)},onSave:function(id,t){ops.saveLine(p.id,id,t)},onDelete:function(id){ops.delLine(p.id,id)}}),
+      a.custom.map(function(c){var key='c_'+c.key;return h(Block,{key:key,title:c.name,lines:blocksFor(key),onAdd:function(t){ops.addLine(p.id,key,t)},onSave:function(id,t){ops.saveLine(p.id,id,t)},onDelete:function(id){ops.delLine(p.id,id)}})}),
+      addSec?div({className:'tile wide',style:{padding:'0 14px'}},h(AddLine,{placeholder:'Name the section, press Enter',onAdd:function(t){ops.addSection(t);},onClose:function(){setAddSec(false)}})):
+        button({className:'slim',onClick:function(){setAddSec(true)}},h(Icon,{n:'plus',s:16}),' Add a section')),
+    div({className:'card',style:{marginTop:14,padding:'6px 16px 0'}},
+      div({className:'row',style:{minHeight:44}},h3(null,'Recent chats'),span({className:'muted small',style:{marginLeft:'auto'}},chats.length+' logged')),
+      chats.length?(allChats?chats:chats.slice(0,2)).map(function(c){
+        var n=p.lines.filter(function(l){return l.chatId===c.id||l.addedIn===c.id}).length+p.rels.filter(function(f){return f.addedIn===c.id}).length;
+        return button({key:c.id,className:'row chatrow','aria-label':'Open chat from '+fmtDate(c.at,now),style:{padding:'10px 0',width:'100%',textAlign:'left',gap:8},onClick:function(){a.onChat(p.id,c.id)}},
+          div({style:{flex:1,minWidth:0}},div({style:{fontWeight:600}},fmtDate(c.at,now)),
+            div({className:'muted small'},TYPE_LABEL[c.type]+' · '+LEN_LABEL[c.length]+' · '+DEPTH_LABEL[c.depth]+(c.duration?' · '+c.duration+' min':'')+(c.feelings&&c.feelings.length?' · '+c.feelings.join(', ').toLowerCase():'')),
+            c.note?div({className:'small',style:{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}},c.note):null),
+          div({className:'chevtag'},n?span({className:'tag'},n+' new'):null,h(Icon,{n:'chev',s:18,w:2})));
+      }):para({className:'muted small',style:{margin:'0 0 10px'}},'No chats yet. Log one after you talk.'),
+      chats.length>2?button({className:'linkbtn',style:{width:'100%',borderTop:'1px solid var(--line)'},onClick:function(){setAllChats(!allChats)}},allChats?'Show fewer':'See all ('+chats.length+')'):null));
+}
+
+/* ---------- app ---------- */
+function useWide(){
+  var _a=useState(function(){return window.matchMedia('(min-width: 980px)').matches}),w=_a[0],setW=_a[1];
+  useEffect(function(){var q=window.matchMedia('(min-width: 980px)');var f=function(){setW(q.matches)};q.addEventListener('change',f);return function(){q.removeEventListener('change',f)}},[]);
+  return w;
+}
+function App(){
+  var wide=useWide();
+  var _d=useState(loadData),data=_d[0],setData=_d[1];
+  var _s=useState(0),shift=_s[0],setShift=_s[1];
+  var _t=useState(0),tick=_t[0],setTick=_t[1];
+  var _tab=useState('home'),tab=_tab[0],setTab=_tab[1];
+  var _pid=useState(null),pid=_pid[0],setPid=_pid[1];
+  var _from=useState('Home'),from=_from[0],setFrom=_from[1];
+  var _sh=useState(null),sheet=_sh[0],setSheet=_sh[1];
+  var _chip=useState(null),chip=_chip[0],setChip=_chip[1];
+  var _rc=useState(null),reached=_rc[0],setReached=_rc[1];
+  var _to=useState(null),toast=_to[0],setToast=_to[1];
+  var toastTimer=useRef(null),acted=useRef(false),prevHero=useRef(null),scrollRef=useRef(null);
+  var now=useMemo(function(){return Date.now()+shift},[shift,tick,data]);
+  var tune=data.tune;
+  useEffect(function(){saveData(data)},[data]);
+  useEffect(function(){var i=setInterval(function(){setTick(function(t){return t+1})},60000);return function(){clearInterval(i)}},[]);
+  var rows=useMemo(function(){return rank(data.people,now,tune)},[data,now]);
+  var hero=useMemo(function(){return pickHero(rows,chip,tune)},[rows,chip,tune]);
+  var heroId=hero.row?hero.row.p.id:null;
+  function say(msg,action){
+    if(toastTimer.current)clearTimeout(toastTimer.current);
+    setToast({msg:msg,action:action||null});
+    toastTimer.current=setTimeout(function(){setToast(null)},action?6000:3800);
+  }
+  useEffect(function(){
+    var prev=prevHero.current;
+    if(prev&&heroId!==prev.id&&!acted.current&&heroId){
+      var old=rows.find(function(r){return r.p.id===prev.id});
+      var np=hero.row.p.name;
+      say(old&&old.status==='asleep'?prev.name+' is outside their awake hours, so Home moved on to '+np+'.':'Home moved on to '+np+'.');
+    }
+    acted.current=false;
+    prevHero.current=heroId?{id:heroId,name:hero.row.p.name}:null;
+  },[heroId]);
+  useEffect(function(){if(scrollRef.current)scrollRef.current.scrollTop=0},[tab,pid]);
+
+  function upd(id,fn){setData(function(d){return Object.assign({},d,{people:d.people.map(function(p){return p.id===id?fn(p):p})})})}
+  var ops={
+    addLine:function(id,block,text){var nid=uid();upd(id,function(p){return Object.assign({},p,{lines:p.lines.concat([{id:nid,block:block,text:text,done:false}])})});return nid},
+    saveLine:function(id,lid,text){upd(id,function(p){return Object.assign({},p,{lines:p.lines.map(function(l){return l.id===lid?Object.assign({},l,{text:text}):l})})})},
+    toggle:function(id,lid){upd(id,function(p){return Object.assign({},p,{lines:p.lines.map(function(l){return l.id===lid?Object.assign({},l,{done:!l.done}):l})})})},
+    delLine:function(id,lid){
+      var person=data.people.find(function(p){return p.id===id}),idx=person.lines.findIndex(function(l){return l.id===lid}),line=person.lines[idx];
+      upd(id,function(p){return Object.assign({},p,{lines:p.lines.filter(function(l){return l.id!==lid})})});
+      say('Line deleted',{label:'Undo',fn:function(){upd(id,function(p){var ls=p.lines.slice();ls.splice(Math.min(idx,ls.length),0,line);return Object.assign({},p,{lines:ls})});setToast(null)}});
+    },
+    delRel:function(id,fid){
+      var person=data.people.find(function(p){return p.id===id}),idx=person.rels.findIndex(function(f){return f.id===fid}),m=person.rels[idx];
+      upd(id,function(p){return Object.assign({},p,{rels:p.rels.filter(function(f){return f.id!==fid})})});
+      say('Removed from their people',{label:'Undo',fn:function(){upd(id,function(p){var fs=p.rels.slice();fs.splice(Math.min(idx,fs.length),0,m);return Object.assign({},p,{rels:fs})});setToast(null)}});
+    },
+    setField:function(id,k,v){upd(id,function(p){var o={};o[k]=v;return Object.assign({},p,o)})},
+    setContact:function(id,v){upd(id,function(p){return Object.assign({},p,{contact:Object.assign({},p.contact,{value:v})})})},
+    addSection:function(name){setData(function(d){return Object.assign({},d,{custom:d.custom.concat([{key:uid(),name:name}])})})},
+    updatePerson:function(id,patch){upd(id,function(p){return Object.assign({},p,patch)})},
+    restore:function(id){upd(id,function(p){return Object.assign({},p,{archived:false})});say('Restored')},
+    deletePerson:function(id){setData(function(d){return Object.assign({},d,{people:d.people.filter(function(p){return p.id!==id})})});setPid(null);setSheet(null);say('Deleted for good')},
+    archive:function(id){upd(id,function(p){return Object.assign({},p,{archived:true})});setPid(null);acted.current=true;say('Archived',{label:'Undo',fn:function(){upd(id,function(p){return Object.assign({},p,{archived:false})});setToast(null)}})}
+  };
+  function setTune(path,val){
+    setData(function(d){var t=JSON.parse(JSON.stringify(d.tune)),o=t;for(var i=0;i<path.length-1;i++)o=o[path[i]];o[path[path.length-1]]=val;return Object.assign({},d,{tune:t})});
+  }
+  function addShift(ms){setShift(ms===0?0:shift+ms)}
+  function openProfile(id){setFrom(tab==='home'?'Home':tab==='people'?'People':'Dates');setPid(id);setSheet(null)}
+  function contact(p){setSheet({kind:'reach',pid:p.id})}
+  function goContact(p,kind){setSheet(null);setReached({pid:p.id,at:Date.now()+shift});say('Demo: this would open '+(kind==='call'?'the dialer':'Messages')+' for '+p.name+'. Come back and tap Log afterwards.')}
+  function skip(p){acted.current=true;upd(p.id,function(x){return Object.assign({},x,{skippedDay:ymd(USER_TZ,now)})});say('Skipped until tomorrow',{label:'Undo',fn:function(){upd(p.id,function(x){return Object.assign({},x,{skippedDay:''})});setToast(null)}})}
+  function snooze(p){acted.current=true;upd(p.id,function(x){return Object.assign({},x,{snoozedUntil:now+tune.snoozeDays*DAY})});say(p.name+' snoozed for '+tune.snoozeDays+' days',{label:'Undo',fn:function(){upd(p.id,function(x){return Object.assign({},x,{snoozedUntil:0})});setToast(null)}})}
+  function saveChat(r){
+    acted.current=true;
+    upd(r.pid,function(p){
+      var chat={id:uid(),at:r.at,type:r.type,length:r.length,depth:r.depth,duration:r.duration,note:r.note||'',feelings:r.feelings.map(function(f){return f.toLowerCase()})};
+      var lines=p.lines.map(function(l){return r.covered.indexOf(l.id)>=0?Object.assign({},l,{chatId:chat.id}):l});
+      lines=lines.map(function(l){return r.added&&r.added.lines.indexOf(l.id)>=0?Object.assign({},l,{addedIn:chat.id}):l});
+      var rels=p.rels.map(function(f){return r.added&&r.added.rels.indexOf(f.id)>=0?Object.assign({},f,{addedIn:chat.id}):f});
+      r.pending.forEach(function(x){
+        if(x.block==='rels')rels.push(x.rel);
+        else lines.push({id:uid(),block:x.block,text:x.text,done:false});
+      });
+      return Object.assign({},p,{chats:p.chats.concat([chat]),lines:lines,rels:rels,skippedDay:'',snoozedUntil:0});
+    });
+    var nm=data.people.find(function(p){return p.id===r.pid}).name;
+    setSheet(null);setReached(function(x){return x&&x.pid===r.pid?null:x});say('Logged. '+nm+"'s clock is reset.");
+  }
+  function createPerson(o,more){
+    acted.current=true;
+    var np={id:uid(),name:o.name,group:o.group,tz:o.tz,contact:o.contact,birthday:'',chats:[],lines:[],rels:[],hometown:'',socials:'',estimate:o.estimate,intervalOverride:0,snoozedUntil:0,skippedDay:'',archived:false};
+    setData(function(d){return Object.assign({},d,{people:d.people.concat([np])})});
+    say(o.name+' added');
+    if(!more){setSheet(null);setFrom('People');setPid(np.id);setTab('people')}
+  }
+  function putRel(personId,m){
+    upd(personId,function(p){var ex=p.rels.some(function(f){return f.id===m.id});return Object.assign({},p,{rels:ex?p.rels.map(function(f){return f.id===m.id?m:f}):p.rels.concat([m])})});
+  }
+  function resetAll(){setData(sampleData(Date.now()));setShift(0);setChip(null);setPid(null);setSheet(null);say('Sample data restored')}
+  function resetTune(){setData(function(d){return Object.assign({},d,{tune:JSON.parse(JSON.stringify(TUNE0))})})}
+
+  var person=pid?data.people.find(function(p){return p.id===pid}):null;
+  var reachP=reached&&(now-reached.at)<3*3600000?data.people.find(function(x){return x.id===reached.pid&&!x.archived}):null;
+  var defaultLogId=person?person.id:(reachP?reachP.id:heroId||(rows[0]&&rows[0].p.id)||(data.people[0]&&data.people[0].id));
+  var active=data.people.filter(function(p){return !p.archived});
+  var common={now:now,tune:tune,people:active,rows:rows};
+  var screen;
+  if(person){
+    screen=h(Profile,{person:person,now:now,tune:tune,ops:ops,custom:data.custom,backLabel:from,onBack:function(){setPid(null)},onContact:contact,onLog:function(id){setSheet({kind:'log',id:id})},onRel:function(personId,fid){setSheet({kind:'rel',pid:personId,fid:fid})},onEdit:function(id){setSheet({kind:'edit',pid:id})},onChat:function(id,cid){setSheet({kind:'chat',pid:id,cid:cid})}});
+  }else if(tab==='home'){
+    screen=h(Home,Object.assign({},common,{hero:hero,chip:chip,onChip:function(c){acted.current=true;setChip(c)},onSkip:skip,onSnooze:snooze,onContact:contact,onLog:function(id){setSheet({kind:'log',id:id})},reachP:reachP,onDismissReach:function(){setReached(null)},onOpen:openProfile,onToggle:ops.toggle,onPeople:function(){setTab('people')}}));
+  }else if(tab==='people'){
+    screen=h(People,Object.assign({},common,{archived:data.people.filter(function(p){return p.archived}),onOpen:openProfile,onAdd:function(){setSheet({kind:'add'})}}));
+  }else{
+    screen=h(Dates,Object.assign({},common,{onOpen:openProfile}));
+  }
+  var title=person?'':(tab==='home'?'Up next':tab==='people'?'People':'Dates');
+  var sheetEl=null;
+  if(sheet){
+    if(sheet.kind==='log')sheetEl=h(LogSheet,{key:sheet.id||'log',people:active,rows:rows,now:now,suggestedId:heroId,defaultId:sheet.id||defaultLogId,onClose:function(){setSheet(null)},onSave:saveChat,onPutRel:putRel,ops:ops,custom:data.custom});
+    else if(sheet.kind==='chat'){var cp=data.people.find(function(p){return p.id===sheet.pid});sheetEl=h(ChatSheet,{person:cp,chat:cp.chats.find(function(c){return c.id===sheet.cid}),now:now,custom:data.custom,onClose:function(){setSheet(null)}})}
+    else if(sheet.kind==='edit'){var ep=data.people.find(function(p){return p.id===sheet.pid});sheetEl=h(EditPersonSheet,{key:ep.id,person:ep,tune:tune,now:now,onClose:function(){setSheet(null)},
+      onSave:function(patch){ops.updatePerson(ep.id,patch);setSheet(null);say('Saved')},
+      onArchive:function(){setSheet(null);ops.archive(ep.id)},onRestore:function(){setSheet(null);ops.restore(ep.id)},onDelete:function(){ops.deletePerson(ep.id)}})}
+    else if(sheet.kind==='reach')sheetEl=h(ReachSheet,{person:data.people.find(function(p){return p.id===sheet.pid}),onClose:function(){setSheet(null)},onGo:goContact});
+    else if(sheet.kind==='add')sheetEl=h(AddSheet,{tune:tune,now:now,onClose:function(){setSheet(null)},onCreate:createPerson});
+    else if(sheet.kind==='rel'){var pp=data.people.find(function(p){return p.id===sheet.pid});sheetEl=h(RelSheet,{key:sheet.fid||'new',member:sheet.fid?pp.rels.find(function(f){return f.id===sheet.fid}):null,existing:pp.rels,onClose:function(){setSheet(null)},onPick:function(m){setSheet({kind:'rel',pid:sheet.pid,fid:m.id})},onSave:function(m){putRel(sheet.pid,m);setSheet(null)},onDelete:function(fid){ops.delRel(sheet.pid,fid);setSheet(null)}})}
+    else if(sheet.kind==='tune')sheetEl=h(Sheet,{title:'Settings',onClose:function(){setSheet(null)}},h(Tune,{chip:chip,tune:tune,setTune:setTune,rows:rows,heroId:heroId,now:now,shift:shift,addShift:addShift,resetAll:resetAll,resetTune:resetTune}));
+  }
+  var showFab=!person&&(tab==='home'||tab==='people');
+  var tabs=[['home','Home','home'],['people','People','people'],['dates','Dates','cal']];
+  return div({className:'stage'},
+    div({className:'phone'},
+      person?null:div({className:'appbar'},h1(null,title),
+        button({className:'iconbtn','aria-label':'Settings',onClick:function(){wide?say('In this prototype, settings are the panel on the right.'):setSheet({kind:'tune'})}},h(Icon,{n:'gear'}))),
+      div({className:'scroll',ref:scrollRef,style:person?{paddingTop:12}:null},screen),
+      nav({className:'nav','aria-label':'Main'},tabs.map(function(t){
+        return button({key:t[0],className:'navbtn','aria-current':(!person&&tab===t[0])?'page':undefined,onClick:function(){setPid(null);setTab(t[0])}},h(Icon,{n:t[2]}),t[1]);
+      })),
+      showFab?button({className:'fab','aria-label':'Log a chat',onClick:function(){setSheet({kind:'log',id:null})}},h(Icon,{n:'chat',s:26,w:2})):null,
+      sheetEl,
+      toast?div({className:'toast',role:'status'},span(null,toast.msg),toast.action?button({onClick:toast.action.fn},toast.action.label):null):null),
+    wide?div({className:'panel'},h(Tune,{chip:chip,tune:tune,setTune:setTune,rows:rows,heroId:heroId,now:now,shift:shift,addShift:addShift,resetAll:resetAll,resetTune:resetTune})):null);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+})();
+</script>
