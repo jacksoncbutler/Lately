@@ -160,6 +160,18 @@ class $SettingsTable extends Settings
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _setupCompletedAtMeta = const VerificationMeta(
+    'setupCompletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> setupCompletedAt =
+      GeneratedColumn<DateTime>(
+        'setup_completed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -176,6 +188,7 @@ class $SettingsTable extends Settings
     recentContactPersonId,
     recentContactAt,
     lastExportAt,
+    setupCompletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -292,6 +305,15 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('setup_completed_at')) {
+      context.handle(
+        _setupCompletedAtMeta,
+        setupCompletedAt.isAcceptableOrUnknown(
+          data['setup_completed_at']!,
+          _setupCompletedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -357,6 +379,10 @@ class $SettingsTable extends Settings
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_export_at'],
       ),
+      setupCompletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}setup_completed_at'],
+      ),
     );
   }
 
@@ -385,6 +411,10 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
 
   /// Device-local: when a backup was last exported. Not written to backups.
   final DateTime? lastExportAt;
+
+  /// Device-local: set when first-run setup is finished (or a backup is
+  /// imported). Not written to backups.
+  final DateTime? setupCompletedAt;
   const AppSettings({
     required this.id,
     required this.createdAt,
@@ -400,6 +430,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     this.recentContactPersonId,
     this.recentContactAt,
     this.lastExportAt,
+    this.setupCompletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -431,6 +462,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     }
     if (!nullToAbsent || lastExportAt != null) {
       map['last_export_at'] = Variable<DateTime>(lastExportAt);
+    }
+    if (!nullToAbsent || setupCompletedAt != null) {
+      map['setup_completed_at'] = Variable<DateTime>(setupCompletedAt);
     }
     return map;
   }
@@ -465,6 +499,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
       lastExportAt: lastExportAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastExportAt),
+      setupCompletedAt: setupCompletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(setupCompletedAt),
     );
   }
 
@@ -490,6 +527,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
       ),
       recentContactAt: serializer.fromJson<DateTime?>(json['recentContactAt']),
       lastExportAt: serializer.fromJson<DateTime?>(json['lastExportAt']),
+      setupCompletedAt: serializer.fromJson<DateTime?>(
+        json['setupCompletedAt'],
+      ),
     );
   }
   @override
@@ -512,6 +552,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
       ),
       'recentContactAt': serializer.toJson<DateTime?>(recentContactAt),
       'lastExportAt': serializer.toJson<DateTime?>(lastExportAt),
+      'setupCompletedAt': serializer.toJson<DateTime?>(setupCompletedAt),
     };
   }
 
@@ -530,6 +571,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     Value<String?> recentContactPersonId = const Value.absent(),
     Value<DateTime?> recentContactAt = const Value.absent(),
     Value<DateTime?> lastExportAt = const Value.absent(),
+    Value<DateTime?> setupCompletedAt = const Value.absent(),
   }) => AppSettings(
     id: id ?? this.id,
     createdAt: createdAt ?? this.createdAt,
@@ -549,6 +591,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
         ? recentContactAt.value
         : this.recentContactAt,
     lastExportAt: lastExportAt.present ? lastExportAt.value : this.lastExportAt,
+    setupCompletedAt: setupCompletedAt.present
+        ? setupCompletedAt.value
+        : this.setupCompletedAt,
   );
   AppSettings copyWithCompanion(SettingsCompanion data) {
     return AppSettings(
@@ -580,6 +625,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
       lastExportAt: data.lastExportAt.present
           ? data.lastExportAt.value
           : this.lastExportAt,
+      setupCompletedAt: data.setupCompletedAt.present
+          ? data.setupCompletedAt.value
+          : this.setupCompletedAt,
     );
   }
 
@@ -599,7 +647,8 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
           ..write('theme: $theme, ')
           ..write('recentContactPersonId: $recentContactPersonId, ')
           ..write('recentContactAt: $recentContactAt, ')
-          ..write('lastExportAt: $lastExportAt')
+          ..write('lastExportAt: $lastExportAt, ')
+          ..write('setupCompletedAt: $setupCompletedAt')
           ..write(')'))
         .toString();
   }
@@ -620,6 +669,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     recentContactPersonId,
     recentContactAt,
     lastExportAt,
+    setupCompletedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -638,7 +688,8 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
           other.theme == this.theme &&
           other.recentContactPersonId == this.recentContactPersonId &&
           other.recentContactAt == this.recentContactAt &&
-          other.lastExportAt == this.lastExportAt);
+          other.lastExportAt == this.lastExportAt &&
+          other.setupCompletedAt == this.setupCompletedAt);
 }
 
 class SettingsCompanion extends UpdateCompanion<AppSettings> {
@@ -656,6 +707,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
   final Value<String?> recentContactPersonId;
   final Value<DateTime?> recentContactAt;
   final Value<DateTime?> lastExportAt;
+  final Value<DateTime?> setupCompletedAt;
   final Value<int> rowid;
   const SettingsCompanion({
     this.id = const Value.absent(),
@@ -672,6 +724,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     this.recentContactPersonId = const Value.absent(),
     this.recentContactAt = const Value.absent(),
     this.lastExportAt = const Value.absent(),
+    this.setupCompletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SettingsCompanion.insert({
@@ -689,6 +742,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     this.recentContactPersonId = const Value.absent(),
     this.recentContactAt = const Value.absent(),
     this.lastExportAt = const Value.absent(),
+    this.setupCompletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        createdAt = Value(createdAt),
@@ -710,6 +764,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     Expression<String>? recentContactPersonId,
     Expression<DateTime>? recentContactAt,
     Expression<DateTime>? lastExportAt,
+    Expression<DateTime>? setupCompletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -728,6 +783,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
         'recent_contact_person_id': recentContactPersonId,
       if (recentContactAt != null) 'recent_contact_at': recentContactAt,
       if (lastExportAt != null) 'last_export_at': lastExportAt,
+      if (setupCompletedAt != null) 'setup_completed_at': setupCompletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -747,6 +803,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     Value<String?>? recentContactPersonId,
     Value<DateTime?>? recentContactAt,
     Value<DateTime?>? lastExportAt,
+    Value<DateTime?>? setupCompletedAt,
     Value<int>? rowid,
   }) {
     return SettingsCompanion(
@@ -765,6 +822,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
           recentContactPersonId ?? this.recentContactPersonId,
       recentContactAt: recentContactAt ?? this.recentContactAt,
       lastExportAt: lastExportAt ?? this.lastExportAt,
+      setupCompletedAt: setupCompletedAt ?? this.setupCompletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -816,6 +874,9 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     if (lastExportAt.present) {
       map['last_export_at'] = Variable<DateTime>(lastExportAt.value);
     }
+    if (setupCompletedAt.present) {
+      map['setup_completed_at'] = Variable<DateTime>(setupCompletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -839,6 +900,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
           ..write('recentContactPersonId: $recentContactPersonId, ')
           ..write('recentContactAt: $recentContactAt, ')
           ..write('lastExportAt: $lastExportAt, ')
+          ..write('setupCompletedAt: $setupCompletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6140,6 +6202,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String?> recentContactPersonId,
   Value<DateTime?> recentContactAt,
   Value<DateTime?> lastExportAt,
+  Value<DateTime?> setupCompletedAt,
   Value<int> rowid,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
@@ -6157,6 +6220,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String?> recentContactPersonId,
   Value<DateTime?> recentContactAt,
   Value<DateTime?> lastExportAt,
+  Value<DateTime?> setupCompletedAt,
   Value<int> rowid,
 });
 
@@ -6236,6 +6300,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<DateTime> get lastExportAt => $composableBuilder(
     column: $table.lastExportAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get setupCompletedAt => $composableBuilder(
+    column: $table.setupCompletedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6318,6 +6387,11 @@ class $$SettingsTableOrderingComposer
     column: $table.lastExportAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get setupCompletedAt => $composableBuilder(
+    column: $table.setupCompletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SettingsTableAnnotationComposer
@@ -6384,6 +6458,11 @@ class $$SettingsTableAnnotationComposer
     column: $table.lastExportAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get setupCompletedAt => $composableBuilder(
+    column: $table.setupCompletedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$SettingsTableTableManager
@@ -6431,6 +6510,7 @@ class $$SettingsTableTableManager
                 Value<String?> recentContactPersonId = const Value.absent(),
                 Value<DateTime?> recentContactAt = const Value.absent(),
                 Value<DateTime?> lastExportAt = const Value.absent(),
+                Value<DateTime?> setupCompletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SettingsCompanion(
                 id: id,
@@ -6447,6 +6527,7 @@ class $$SettingsTableTableManager
                 recentContactPersonId: recentContactPersonId,
                 recentContactAt: recentContactAt,
                 lastExportAt: lastExportAt,
+                setupCompletedAt: setupCompletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6465,6 +6546,7 @@ class $$SettingsTableTableManager
                 Value<String?> recentContactPersonId = const Value.absent(),
                 Value<DateTime?> recentContactAt = const Value.absent(),
                 Value<DateTime?> lastExportAt = const Value.absent(),
+                Value<DateTime?> setupCompletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SettingsCompanion.insert(
                 id: id,
@@ -6481,6 +6563,7 @@ class $$SettingsTableTableManager
                 recentContactPersonId: recentContactPersonId,
                 recentContactAt: recentContactAt,
                 lastExportAt: lastExportAt,
+                setupCompletedAt: setupCompletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

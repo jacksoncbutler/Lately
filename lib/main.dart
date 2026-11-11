@@ -9,10 +9,12 @@ import 'package:path_provider/path_provider.dart';
 import 'app_config.dart';
 import 'data/providers.dart';
 import 'data/safe_open.dart';
+import 'domain/timezones.dart';
 import 'features/home/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ensureTimezonesLoaded();
   final docs = await getApplicationDocumentsDirectory();
   final support = await getApplicationSupportDirectory();
   final snapshots = Directory(p.join(support.path, 'snapshots'));

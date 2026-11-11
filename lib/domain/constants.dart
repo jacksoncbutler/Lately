@@ -16,5 +16,17 @@ class Tune {
   static const awakeEndHour = 22;
   static const snoozeDays = 7;
   static const groupIntervalDays = {'parents': 14, 'siblings': 21, 'friends': 30};
+  /// "Roughly when did you last talk?" answers, in days ago.
+  static const lastTalkedChoices = [
+    ('A week', 7),
+    ('Two weeks', 14),
+    ('A month', 30),
+    ('A few months', 90),
+    ('Six months', 180),
+    ('A year or more', 360),
+  ];
+
+  /// Used when the question is skipped.
+  static const defaultLastTalkedDays = 180;
   static const lengthMinutes = {'quick': 15, 'catchup': 30, 'long': 60};
 }

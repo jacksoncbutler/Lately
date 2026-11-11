@@ -31,6 +31,10 @@ class Settings extends Table with RecordColumns {
 
   /// Device-local: when a backup was last exported. Not written to backups.
   DateTimeColumn get lastExportAt => dateTime().nullable()();
+
+  /// Device-local: set when first-run setup is finished (or a backup is
+  /// imported). Not written to backups.
+  DateTimeColumn get setupCompletedAt => dateTime().nullable()();
 }
 
 @DataClassName('GroupRow')

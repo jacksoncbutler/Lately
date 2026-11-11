@@ -19,15 +19,19 @@ void main() {
   });
   tearDown(() => tmp.deleteSync(recursive: true));
 
-  /// A database file exactly as build 0.2.0 wrote it (schema version 1).
-  Future<void> makeVersion1File() async {
+  /// A database file as an older build wrote it: schema [version] 1 (0.2.0)
+  /// or 2 (0.3.0).
+  Future<void> makeOldFile({int version = 1}) async {
     final db = LatelyDatabase(NativeDatabase(dbFile));
     final repo = Repository(db);
     final g = (await repo.listGroups()).first.id;
     await repo.createPerson(
         displayName: 'Sam', groupId: g, timezone: 'UTC', contactMethodType: 'text');
-    await db.customStatement('ALTER TABLE settings DROP COLUMN last_export_at');
-    await db.customStatement('PRAGMA user_version = 1');
+    await db.customStatement('ALTER TABLE settings DROP COLUMN setup_completed_at');
+    if (version < 2) {
+      await db.customStatement('ALTER TABLE settings DROP COLUMN last_export_at');
+    }
+    await db.customStatement('PRAGMA user_version = $version');
     await db.close();
   }
 
@@ -41,18 +45,40 @@ void main() {
   });
 
   test('upgrade from 0.2.0 data: copy taken first, data kept, new column works', () async {
-    await makeVersion1File();
+    await makeOldFile();
     final db = await openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain());
     final repo = Repository(db);
     expect((await repo.listPeople()).single.displayName, 'Sam');
     expect((await repo.getSettings()).lastExportAt, isNull); // column exists again
-    final copies = snaps.listSync().map((e) => e.path).where((p) => p.contains('pre-migration-v1-to-v2'));
+    final copies = snaps.listSync().map((e) => e.path).where((p) => p.contains('pre-migration-v1-to-v3'));
     expect(copies, hasLength(1));
+    expect(await repo.isSetupComplete(), isTrue); // Sam exists
+    await db.close();
+  });
+
+  test('upgrade from 0.3.0 data: people mean setup is already done', () async {
+    await makeOldFile(version: 2);
+    final db = await openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain());
+    final repo = Repository(db);
+    expect((await repo.listPeople()).single.displayName, 'Sam');
+    expect(await repo.isSetupComplete(), isTrue);
+    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v2-to-v3')), hasLength(1));
+    await db.close();
+  });
+
+  test('upgrade from 0.2.0 with no people leaves setup to do', () async {
+    final db0 = LatelyDatabase(NativeDatabase(dbFile));
+    await db0.customStatement('ALTER TABLE settings DROP COLUMN setup_completed_at');
+    await db0.customStatement('ALTER TABLE settings DROP COLUMN last_export_at');
+    await db0.customStatement('PRAGMA user_version = 1');
+    await db0.close();
+    final db = await openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain());
+    expect(await Repository(db).isSetupComplete(), isFalse);
     await db.close();
   });
 
   test('failed upgrade puts the data back exactly as it was', () async {
-    await makeVersion1File();
+    await makeOldFile();
     final before = dbFile.readAsBytesSync();
 
     await expectLater(
@@ -77,7 +103,7 @@ void main() {
   });
 
   test('data from a newer version is left alone', () async {
-    await makeVersion1File();
+    await makeOldFile();
     final before = dbFile.readAsBytesSync();
     await expectLater(
       openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain(), targetVersion: 0 + 0),
@@ -88,7 +114,7 @@ void main() {
 
   test('only the newest few migration copies are kept', () async {
     for (var i = 0; i < 5; i++) {
-      await makeVersion1File();
+      await makeOldFile();
       final db = await openDatabaseSafely(
           dbFile: dbFile,
           snapshotDir: snaps,

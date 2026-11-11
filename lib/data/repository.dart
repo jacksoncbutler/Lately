@@ -24,6 +24,15 @@ class Repository {
       (db.update(db.settings)..where((t) => t.id.equals(settingsId)))
           .write(c.copyWith(updatedAt: Value(_now)));
 
+  Future<bool> isSetupComplete() async =>
+      (await getSettings()).setupCompletedAt != null;
+
+  Future<void> completeSetup() => updateSettings(
+      SettingsCompanion(setupCompletedAt: Value(_now)));
+
+  Future<void> setBlockOrder(List<String> order) => updateSettings(
+      SettingsCompanion(blockOrder: Value(jsonEncode(order))));
+
   List<String> blockOrderOf(AppSettings s) =>
       (jsonDecode(s.blockOrder) as List).cast<String>();
 
@@ -65,6 +74,7 @@ class Repository {
     String? contactMethodValue,
     DateTime? lastTalkedEstimate,
     bool timezoneConfirmed = false,
+    String? phone,
   }) async {
     final id = newId();
     final t = _now;
@@ -77,9 +87,39 @@ class Repository {
         timezone: timezone,
         contactMethodType: contactMethodType,
         contactMethodValue: Value(contactMethodValue),
+        phone: Value(phone),
         lastTalkedEstimate: Value(lastTalkedEstimate?.toUtc()),
         timezoneConfirmed: Value(timezoneConfirmed)));
     return id;
+  }
+
+  /// Adds many people in one transaction (bulk add). Returns their ids.
+  Future<List<String>> createPeople(
+      List<
+              ({
+                String displayName,
+                String? phone,
+              })>
+          people,
+      {required String groupId,
+      required String timezone,
+      required bool timezoneConfirmed,
+      DateTime? lastTalkedEstimate}) {
+    return db.transaction(() async {
+      final ids = <String>[];
+      for (final p in people) {
+        ids.add(await createPerson(
+            displayName: p.displayName,
+            groupId: groupId,
+            timezone: timezone,
+            timezoneConfirmed: timezoneConfirmed,
+            contactMethodType: 'text',
+            contactMethodValue: p.phone,
+            phone: p.phone,
+            lastTalkedEstimate: lastTalkedEstimate));
+      }
+      return ids;
+    });
   }
 
   Future<PersonRow?> getPerson(String id) => (db.select(db.people)

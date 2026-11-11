@@ -13,3 +13,10 @@ Maps the repository to `docs/technical-plan.md`. Calls only go downward.
 | `reference/` | Behaviour of record | Prototype and `logic.js` / `test.js`; do not edit |
 
 Temporary identity (name, icon, package id `net.butler.lately`) is in `lib/app_config.dart` and the Android manifest. Platform-specific features (contacts, file picking, share sheet) go behind small interfaces in `lib/data` so iOS can be added later.
+
+## Step 4 notes
+
+- `lib/domain/timezones.dart` wraps the bundled IANA database (`latest_all`, which includes link names such as `Europe/Amsterdam` that phones report). `lib/domain/cities.dart` is the offline city list; search also covers every city in the tz database and country names.
+- `lib/data/device_sources.dart` holds the two platform inputs (phone contacts, device timezone) behind interfaces. READ_CONTACTS is declared in the manifest but only requested when a bulk add starts.
+- First-run setup completion is device-local (`settings.setupCompletedAt`, not exported). Importing a backup marks setup done.
+- Until profiles (step 5) and People (step 8) exist, `people_screen.dart` is a minimal list; tapping a person only sets their timezone.

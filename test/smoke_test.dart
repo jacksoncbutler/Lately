@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lately/data/backup_platform.dart';
 import 'package:lately/data/database.dart';
 import 'package:lately/data/providers.dart';
+import 'package:lately/data/repository.dart';
 import 'package:lately/main.dart';
 
 class FakePlatform implements BackupPlatform {
@@ -38,6 +39,7 @@ void main() {
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
+    await Repository(db).completeSetup();
     await tester.pumpWidget(ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
@@ -46,14 +48,16 @@ void main() {
       ],
       child: const LatelyApp(),
     ));
-    await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 200)));
-    await tester.pump();
+    for (var i = 0; i < 4; i++) {
+      await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+      await tester.pump();
+    }
   }
 
-  testWidgets('home shows the app is up', (tester) async {
+  testWidgets('an empty app invites you to add someone', (tester) async {
     await pumpApp(tester);
-    expect(find.text('Lately'), findsOneWidget);
-    expect(find.text('Database ready · 3 groups'), findsOneWidget);
+    expect(find.text('Add someone'), findsOneWidget);
+    expect(find.text('Add from contacts'), findsOneWidget);
   });
 
   testWidgets('settings has Export and Import backup', (tester) async {

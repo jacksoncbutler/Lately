@@ -347,6 +347,10 @@ class BackupService {
       }
 
       await _writeSettings(backup, mode);
+      // Restoring a backup means setup is not needed on this device.
+      await (db.update(db.settings)
+            ..where((t) => t.id.equals(settingsId) & t.setupCompletedAt.isNull()))
+          .write(SettingsCompanion(setupCompletedAt: Value(_clock().toUtc())));
     });
     return ImportResult(inserted: inserted, updated: updated);
   }

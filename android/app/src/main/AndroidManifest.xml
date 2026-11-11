@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Asked at runtime only when a bulk add from contacts starts. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
     <application
         android:label="Lately"
         android:allowBackup="false"

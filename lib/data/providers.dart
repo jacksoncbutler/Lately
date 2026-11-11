@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'backup/backup_service.dart';
 import 'backup_platform.dart';
 import 'database.dart';
+import 'device_sources.dart';
 import 'repository.dart';
 
 /// Set in main() after the database has been opened safely (see safe_open.dart).
@@ -29,3 +30,21 @@ final backupServiceProvider = Provider<BackupService>((ref) => BackupService(
 /// Step 2 proof-of-life: group count read from the real database.
 final groupCountProvider = FutureProvider<int>((ref) async =>
     (await ref.watch(repositoryProvider).listGroups()).length);
+
+final contactsSourceProvider =
+    Provider<ContactsSource>((ref) => DeviceContactsSource());
+
+final deviceTimezoneProvider =
+    Provider<DeviceTimezone>((ref) => FlutterDeviceTimezone());
+
+/// The current time; tests override it for stable clocks.
+final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+final setupCompleteProvider = FutureProvider<bool>(
+    (ref) => ref.watch(repositoryProvider).isSetupComplete());
+
+final peopleProvider = FutureProvider<List<PersonRow>>(
+    (ref) => ref.watch(repositoryProvider).listPeople());
+
+final groupsProvider = FutureProvider<List<GroupRow>>(
+    (ref) => ref.watch(repositoryProvider).listGroups());
