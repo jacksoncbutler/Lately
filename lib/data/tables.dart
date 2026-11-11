@@ -28,6 +28,9 @@ class Settings extends Table with RecordColumns {
   TextColumn get theme => text().nullable()();
   TextColumn get recentContactPersonId => text().nullable()();
   DateTimeColumn get recentContactAt => dateTime().nullable()();
+
+  /// Device-local: when a backup was last exported. Not written to backups.
+  DateTimeColumn get lastExportAt => dateTime().nullable()();
 }
 
 @DataClassName('GroupRow')

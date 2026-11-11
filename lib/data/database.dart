@@ -27,9 +27,9 @@ String newId() => _uuid.v4();
 class LatelyDatabase extends _$LatelyDatabase {
   LatelyDatabase(super.e);
 
-  /// Bump with every table change and add a step in [migration]. A snapshot of
-  /// the data is taken before migrating (build step 3).
-  static const currentSchemaVersion = 1;
+  /// Bump with every table change and add a step in [onUpgrade]. The database
+  /// file is copied aside before migrating (see lib/data/safe_open.dart).
+  static const currentSchemaVersion = 2;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -39,6 +39,14 @@ class LatelyDatabase extends _$LatelyDatabase {
         onCreate: (m) async {
           await m.createAll();
           await seed();
+        },
+        onUpgrade: (m, from, to) async {
+          // Each step is kept forever. Add new steps below; never edit old ones.
+          if (from < 2) {
+            await m.addColumn(settings, settings.lastExportAt);
+            await (update(settings)..where((t) => t.id.equals(settingsId)))
+                .write(const SettingsCompanion(schemaVersion: Value(2)));
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');

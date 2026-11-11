@@ -149,6 +149,17 @@ class $SettingsTable extends Settings
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _lastExportAtMeta = const VerificationMeta(
+    'lastExportAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastExportAt = GeneratedColumn<DateTime>(
+    'last_export_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -164,6 +175,7 @@ class $SettingsTable extends Settings
     theme,
     recentContactPersonId,
     recentContactAt,
+    lastExportAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -271,6 +283,15 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('last_export_at')) {
+      context.handle(
+        _lastExportAtMeta,
+        lastExportAt.isAcceptableOrUnknown(
+          data['last_export_at']!,
+          _lastExportAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -332,6 +353,10 @@ class $SettingsTable extends Settings
         DriftSqlType.dateTime,
         data['${effectivePrefix}recent_contact_at'],
       ),
+      lastExportAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_export_at'],
+      ),
     );
   }
 
@@ -357,6 +382,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
   final String? theme;
   final String? recentContactPersonId;
   final DateTime? recentContactAt;
+
+  /// Device-local: when a backup was last exported. Not written to backups.
+  final DateTime? lastExportAt;
   const AppSettings({
     required this.id,
     required this.createdAt,
@@ -371,6 +399,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     this.theme,
     this.recentContactPersonId,
     this.recentContactAt,
+    this.lastExportAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -399,6 +428,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     }
     if (!nullToAbsent || recentContactAt != null) {
       map['recent_contact_at'] = Variable<DateTime>(recentContactAt);
+    }
+    if (!nullToAbsent || lastExportAt != null) {
+      map['last_export_at'] = Variable<DateTime>(lastExportAt);
     }
     return map;
   }
@@ -430,6 +462,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
       recentContactAt: recentContactAt == null && nullToAbsent
           ? const Value.absent()
           : Value(recentContactAt),
+      lastExportAt: lastExportAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastExportAt),
     );
   }
 
@@ -454,6 +489,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
         json['recentContactPersonId'],
       ),
       recentContactAt: serializer.fromJson<DateTime?>(json['recentContactAt']),
+      lastExportAt: serializer.fromJson<DateTime?>(json['lastExportAt']),
     );
   }
   @override
@@ -475,6 +511,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
         recentContactPersonId,
       ),
       'recentContactAt': serializer.toJson<DateTime?>(recentContactAt),
+      'lastExportAt': serializer.toJson<DateTime?>(lastExportAt),
     };
   }
 
@@ -492,6 +529,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     Value<String?> theme = const Value.absent(),
     Value<String?> recentContactPersonId = const Value.absent(),
     Value<DateTime?> recentContactAt = const Value.absent(),
+    Value<DateTime?> lastExportAt = const Value.absent(),
   }) => AppSettings(
     id: id ?? this.id,
     createdAt: createdAt ?? this.createdAt,
@@ -510,6 +548,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     recentContactAt: recentContactAt.present
         ? recentContactAt.value
         : this.recentContactAt,
+    lastExportAt: lastExportAt.present ? lastExportAt.value : this.lastExportAt,
   );
   AppSettings copyWithCompanion(SettingsCompanion data) {
     return AppSettings(
@@ -538,6 +577,9 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
       recentContactAt: data.recentContactAt.present
           ? data.recentContactAt.value
           : this.recentContactAt,
+      lastExportAt: data.lastExportAt.present
+          ? data.lastExportAt.value
+          : this.lastExportAt,
     );
   }
 
@@ -556,7 +598,8 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
           ..write('skipPolicy: $skipPolicy, ')
           ..write('theme: $theme, ')
           ..write('recentContactPersonId: $recentContactPersonId, ')
-          ..write('recentContactAt: $recentContactAt')
+          ..write('recentContactAt: $recentContactAt, ')
+          ..write('lastExportAt: $lastExportAt')
           ..write(')'))
         .toString();
   }
@@ -576,6 +619,7 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
     theme,
     recentContactPersonId,
     recentContactAt,
+    lastExportAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -593,7 +637,8 @@ class AppSettings extends DataClass implements Insertable<AppSettings> {
           other.skipPolicy == this.skipPolicy &&
           other.theme == this.theme &&
           other.recentContactPersonId == this.recentContactPersonId &&
-          other.recentContactAt == this.recentContactAt);
+          other.recentContactAt == this.recentContactAt &&
+          other.lastExportAt == this.lastExportAt);
 }
 
 class SettingsCompanion extends UpdateCompanion<AppSettings> {
@@ -610,6 +655,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
   final Value<String?> theme;
   final Value<String?> recentContactPersonId;
   final Value<DateTime?> recentContactAt;
+  final Value<DateTime?> lastExportAt;
   final Value<int> rowid;
   const SettingsCompanion({
     this.id = const Value.absent(),
@@ -625,6 +671,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     this.theme = const Value.absent(),
     this.recentContactPersonId = const Value.absent(),
     this.recentContactAt = const Value.absent(),
+    this.lastExportAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SettingsCompanion.insert({
@@ -641,6 +688,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     this.theme = const Value.absent(),
     this.recentContactPersonId = const Value.absent(),
     this.recentContactAt = const Value.absent(),
+    this.lastExportAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        createdAt = Value(createdAt),
@@ -661,6 +709,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     Expression<String>? theme,
     Expression<String>? recentContactPersonId,
     Expression<DateTime>? recentContactAt,
+    Expression<DateTime>? lastExportAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -678,6 +727,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
       if (recentContactPersonId != null)
         'recent_contact_person_id': recentContactPersonId,
       if (recentContactAt != null) 'recent_contact_at': recentContactAt,
+      if (lastExportAt != null) 'last_export_at': lastExportAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -696,6 +746,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     Value<String?>? theme,
     Value<String?>? recentContactPersonId,
     Value<DateTime?>? recentContactAt,
+    Value<DateTime?>? lastExportAt,
     Value<int>? rowid,
   }) {
     return SettingsCompanion(
@@ -713,6 +764,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
       recentContactPersonId:
           recentContactPersonId ?? this.recentContactPersonId,
       recentContactAt: recentContactAt ?? this.recentContactAt,
+      lastExportAt: lastExportAt ?? this.lastExportAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -761,6 +813,9 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
     if (recentContactAt.present) {
       map['recent_contact_at'] = Variable<DateTime>(recentContactAt.value);
     }
+    if (lastExportAt.present) {
+      map['last_export_at'] = Variable<DateTime>(lastExportAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -783,6 +838,7 @@ class SettingsCompanion extends UpdateCompanion<AppSettings> {
           ..write('theme: $theme, ')
           ..write('recentContactPersonId: $recentContactPersonId, ')
           ..write('recentContactAt: $recentContactAt, ')
+          ..write('lastExportAt: $lastExportAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6083,6 +6139,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String?> theme,
   Value<String?> recentContactPersonId,
   Value<DateTime?> recentContactAt,
+  Value<DateTime?> lastExportAt,
   Value<int> rowid,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
@@ -6099,6 +6156,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String?> theme,
   Value<String?> recentContactPersonId,
   Value<DateTime?> recentContactAt,
+  Value<DateTime?> lastExportAt,
   Value<int> rowid,
 });
 
@@ -6173,6 +6231,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<DateTime> get recentContactAt => $composableBuilder(
     column: $table.recentContactAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastExportAt => $composableBuilder(
+    column: $table.lastExportAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6250,6 +6313,11 @@ class $$SettingsTableOrderingComposer
     column: $table.recentContactAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get lastExportAt => $composableBuilder(
+    column: $table.lastExportAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SettingsTableAnnotationComposer
@@ -6311,6 +6379,11 @@ class $$SettingsTableAnnotationComposer
     column: $table.recentContactAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get lastExportAt => $composableBuilder(
+    column: $table.lastExportAt,
+    builder: (column) => column,
+  );
 }
 
 class $$SettingsTableTableManager
@@ -6357,6 +6430,7 @@ class $$SettingsTableTableManager
                 Value<String?> theme = const Value.absent(),
                 Value<String?> recentContactPersonId = const Value.absent(),
                 Value<DateTime?> recentContactAt = const Value.absent(),
+                Value<DateTime?> lastExportAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SettingsCompanion(
                 id: id,
@@ -6372,6 +6446,7 @@ class $$SettingsTableTableManager
                 theme: theme,
                 recentContactPersonId: recentContactPersonId,
                 recentContactAt: recentContactAt,
+                lastExportAt: lastExportAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6389,6 +6464,7 @@ class $$SettingsTableTableManager
                 Value<String?> theme = const Value.absent(),
                 Value<String?> recentContactPersonId = const Value.absent(),
                 Value<DateTime?> recentContactAt = const Value.absent(),
+                Value<DateTime?> lastExportAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SettingsCompanion.insert(
                 id: id,
@@ -6404,6 +6480,7 @@ class $$SettingsTableTableManager
                 theme: theme,
                 recentContactPersonId: recentContactPersonId,
                 recentContactAt: recentContactAt,
+                lastExportAt: lastExportAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
