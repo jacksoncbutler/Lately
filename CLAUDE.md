@@ -22,12 +22,10 @@ Lately is a personal, offline, device-only mobile app that ranks who to talk to 
 - Other-day logs are date-only: store 12:00 local, mark approximate, never in the future. No time-of-day choice.
 
 ## Open questions (ask Jackson, do not guess)
-- Skip behaviour: returns tomorrow, or after N days? (current default: midnight local)
-- Should in-person contact count differently toward the interval?
-- Important dates beyond birthdays: which kinds?
-- Final icon artwork (orbit concept) for store sizes.
-- Priority weights per group are all 1.0 in version 1; tune after real use.
-- App name availability (store, domain, trademark) has not been checked.
+- None blocking. Settled Nov 2026: skip returns the next day, or sooner once every other eligible person has been contacted that day; in-person contact counts the same as any other; important dates (life events such as "their documentary release") come after version 1; the name "Lately" and the orbit icon are temporary, so keep name, icon and package id in one place; iOS comes later, so keep platform code (contacts, file picking, share sheet) behind small interfaces; group priority weights stay 1.0 and tune after real use; no export reminder in version 1.
+
+## Backup is a first-class feature
+A minimal Settings screen with Export backup and Import backup ships in step 3 (reachable from the Home icon), not step 8. Before any database migration the app snapshots the current data and restores it if the migration fails. Replace-import asks for confirmation and snapshots first.
 
 ## Done means
 Analyzer clean, tests green (including backup import fixtures), APK installs over the previous build without losing data.

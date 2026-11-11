@@ -117,7 +117,7 @@ Version 1 is the smallest app that does the core loop: add people, see who to ta
 - People: searchable list grouped by group, showing days since last contact. Archived people sit in a collapsed Archived section at the bottom.
 - Dates: a simple upcoming list of birthdays and important dates. (proposed: no full calendar view in version 1.)
 
-**7. Settings and backup**
+**7. Settings and backup** (a minimal Settings screen with Export and Import ships early, in build step 3; the rest follows in step 8)
 
 - Edit groups, intervals, and block order.
 - Export everything to one backup file, and import it back. Format described in the technical document.
@@ -150,9 +150,9 @@ Good ideas that wait until version 1 has been used for a while.
 - [x] Framework: confirm one cross-platform codebase for Android and iPhone (recommendation in the technical document), or Android first.
 - [ ] iPhone distribution: needs a paid Apple developer account and a Mac build step. Start iOS later or in parallel?
 - [ ] Priority weighting: how much does time since last chat count against group importance? Tune after real use.
-- [ ] Skip behavior: does a skipped person return tomorrow, or after a set number of days?
+- [x] Skip behavior: a skipped person returns the next day, or sooner once every other eligible person has been contacted that day.
 - [ ] Time chips: now a soft preference, not a filter. Tune the miss weight (0.6) and the length guess after real use.
-- [ ] "Last in person" and "last call or text": should an in-person visit count differently toward the interval?
+- [x] "Last in person" and "last call or text": in-person counts the same toward the interval.
 - [x] Awake window default: is 8am to 10pm local the right global assumption?
-- [ ] Important dates beyond birthdays: which kinds (anniversaries, trips, events)?
-- [ ] Final icon artwork: refine the orbit concept for app store sizes.
+- [x] Important dates beyond birthdays: after version 1, simple life events ("their documentary release", "returning home from travel").
+- [x] Final icon artwork: later; a temporary orbit icon ships first. The name Lately is also temporary.

@@ -184,14 +184,14 @@ When a person has no chats, 30 minutes is counted. The last-talked answer at onb
 **Expected length and time chips**
 
 - Base length: the average minutes of that person's last five chats, using the exact duration when one was entered and the table above otherwise; 30 if they have none.
-- Gap scaling: no change at or under their interval, rising smoothly to double the base at four times the interval, capped at 120 minutes and rounded to 5. With five or more chats, only 40% of that rise applies, so strong history wins; with no history all of it applies. Tunable: gap boost 2, gap ratio 4, history trust 5 chats, damping 0.6, cap 120.
+- Gap scaling: no change at or under their interval, rising smoothly to double the base at four times the interval, capped at 90 minutes (the prototype's expCap) and rounded to 5. With five or more chats, only 40% of that rise applies, so strong history wins; with no history all of it applies. Tunable: gap boost 2, gap ratio 4, history trust 5 chats, damping 0.6, cap 90.
 - The why line says "usually" when there are three or more chats and the gap barely moved the guess, otherwise "probably".
 - The time control is a four-stop slider (Any, 15, 30, 60+) and is a soft preference, never a filter. 15 fits people with expected length of 20 or less, 30 fits 20 or more, 60+ fits 50 or more.
 - With a chip on, a person who does not fit has their overdue ratio multiplied by the chip penalty (0.6). The highest adjusted score wins, so a very overdue person can still appear; the note then reads A quick hello still counts (15 min) or Not a perfect fit for that, but they are the most due.
 
 **Skip and snooze**
 
-- Skip hides that person until midnight local time, then they return at the same rank.
+- Skip hides that person until midnight local time, then they return at the same rank. They come back sooner if every other eligible person has already been contacted that day (a skipped person is the fallback before showing You're caught up).
 - Snooze hides them for 7 days by default, and the user can pick another date.
 
 **Why line**
@@ -246,12 +246,12 @@ Build in nine steps, each ending with something you can install and check on the
 | --- | --- | --- |
 | 1. Skeleton and CI | Flutter project, folder layout, analyzer and tests on every push, signed release APK attached to a GitHub Release | The APK installs on the Pixel and opens to an empty screen; the same keystore signs every build |
 | 2. Data layer | Database tables for every entity, migrations, constants file, seeded groups | Automated tests create, read, update, and archive each entity |
-| 3. Backup | Export and import in format 1.0 with validation, replace and merge modes, and a sample file in test fixtures | Export then import on a fresh install restores everything; malformed and newer-major files are refused without changes |
+| 3. Backup | Export and import in format 1.0 with validation, replace and merge modes, a sample file in test fixtures, a minimal Settings screen (from the Home icon) with Export backup and Import backup, share-sheet export named lately-backup-YYYY-MM-DD.json, last-export date, and an automatic snapshot before any database migration or replace-import (restored if it fails) | Export then import on a fresh install restores everything; round-trip, corrupted, bad-checksum and newer-major files are tested and refused without changes; a failed migration restores the snapshot |
 | 4. Setup and add people | Group defaults screen, single add, offline city search for timezone, last-talked estimate, bulk add from contacts | Five people added, including a batch from contacts, with correct local times shown |
 | 5. Profile | Header with contact actions, blocks, swipe lines, Next time checkboxes, family tiles, peek and expand | Every block type adds, edits, and deletes lines; empty blocks collapse |
 | 6. Log a conversation | Floating log button and popup, three required taps, optional feelings and lines, offer of checked Next time items, history list | Saving a chat resets the clock and updates last in person and last call or text |
-| 7. Rules and Home | Ranking, awake window, hero card with live refresh, why line, skip, snooze, time chips, dates strip | Tests pass for: higher overdue ratio beats group importance, asleep people excluded, skipped excluded until midnight, each chip filters correctly |
-| 8. People, Dates, Settings | Searchable people list, upcoming dates list, settings for groups, block order, and awake window | Changing a group interval changes the ranking on Home |
+| 7. Rules and Home | Ranking, awake window, hero card with live refresh, why line, skip, snooze, time chips, dates strip | Tests pass for: higher overdue ratio beats group importance, asleep people excluded, skipped excluded until midnight unless nobody else is eligible, each chip filters correctly |
+| 8. People, Dates, Settings | Searchable people list, upcoming dates list, and the rest of Settings (groups, block order, awake window) added to the step 3 screen | Changing a group interval changes the ranking on Home |
 | 9. Polish | Empty states, edge cases, performance with 200 people, export warning, name and icon | Every state in Edge cases and privacy is reachable and looks intentional |
 
 Working rules for the builder:
@@ -260,3 +260,7 @@ Working rules for the builder:
 - Export a backup before installing any build that changes the database.
 - Never change an existing required field; follow the compatibility rules under Backup format.
 - iPhone support is a separate step after step 9: macOS build runner, signing, and TestFlight.
+
+## Repository layout and conventions
+
+The Flutter project lives at the repository root, next to `docs/` and `reference/`: `lib/`, `test/`, `pubspec.yaml`, `android/`. `docs/ARCHITECTURE.md` maps folders to this plan. App name, icon and package id (`net.butler.lately`) are kept in one place because they are temporary. Platform-specific code (contacts, file picking, share sheet) sits behind small interfaces so iPhone support can be added later.
