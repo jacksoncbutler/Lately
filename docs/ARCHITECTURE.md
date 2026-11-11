@@ -7,7 +7,7 @@ Maps the repository to `docs/technical-plan.md`. Calls only go downward.
 | `lib/ui` | Shared widgets | Swipe line, block tile, chips |
 | `lib/features/<name>` | Screens | home, people, profile, log, dates, settings, onboarding |
 | `lib/domain` | Rules | Pure Dart ranking, expected length, why line, awake window; `constants.dart` holds every tunable number. No Flutter or storage imports |
-| `lib/data` | Storage | Drift database, migrations, backup export/import, pre-migration snapshot |
+| `lib/data` | Storage | `tables.dart` (schema), `database.dart` (seed, migrations), `repository.dart` (create/read/update/archive/soft-delete), `providers.dart` (Riverpod). `database.g.dart` is generated: after changing tables run `dart run build_runner build` and commit it. Backup export/import and the pre-migration snapshot arrive in step 3 |
 | `test/` | Tests | Domain tests ported from `reference/test.js`; `test/fixtures/` holds one sample backup per format version |
 | `android/` | Platform | Release signing via `key.properties` (gitignored), no INTERNET in release, cloud backup off |
 | `reference/` | Behaviour of record | Prototype and `logic.js` / `test.js`; do not edit |
