@@ -31,6 +31,9 @@ class Repository {
   Future<void> completeSetup() => updateSettings(
       SettingsCompanion(setupCompletedAt: Value(_now)));
 
+  Future<void> setAwakeWindow(String start, String end) => updateSettings(
+      SettingsCompanion(awakeStart: Value(start), awakeEnd: Value(end)));
+
   Future<void> setBlockOrder(List<String> order) => updateSettings(
       SettingsCompanion(blockOrder: Value(jsonEncode(order))));
 
@@ -61,6 +64,24 @@ class Repository {
   Future<GroupRow?> getGroup(String id) => (db.select(db.groups)
         ..where((t) => t.id.equals(id) & t.deletedAt.isNull()))
       .getSingleOrNull();
+
+  /// People in a group, archived ones included (a group in use cannot be removed).
+  Future<int> peopleInGroup(String groupId) async => (await (db.select(db.people)
+            ..where((t) => t.groupId.equals(groupId) & t.deletedAt.isNull()))
+          .get())
+      .length;
+
+  /// Removes an empty group (soft delete). Throws if people are still in it
+  /// or it is the last group.
+  Future<void> deleteGroup(String id) async {
+    if (await peopleInGroup(id) > 0) {
+      throw StateError('That group still has people in it');
+    }
+    if ((await listGroups()).length <= 1) {
+      throw StateError('Keep at least one group');
+    }
+    await updateGroup(id, GroupsCompanion(deletedAt: Value(_now)));
+  }
 
   Future<void> updateGroup(String id, GroupsCompanion c) =>
       (db.update(db.groups)..where((t) => t.id.equals(id)))

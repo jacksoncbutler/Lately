@@ -5,7 +5,7 @@ class AppConfig {
   static const appName = 'Lately';
 
   /// Keep equal to the version in pubspec.yaml (a test checks this).
-  static const appVersion = '0.7.1';
+  static const appVersion = '0.8.0';
   static const backupFormat = 'lately-backup';
 
   /// Backup file format. Major changes need a migration; minor only add

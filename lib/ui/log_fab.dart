@@ -11,6 +11,8 @@ class LogFab extends StatelessWidget {
   Widget build(BuildContext context) => FloatingActionButton(
         key: const Key('log-fab'),
         tooltip: 'Log a chat',
+        // Home and People each have one, and both stay in the tree.
+        heroTag: null,
         shape: const CircleBorder(),
         onPressed: () => showLogSheet(context),
         child: const Icon(Icons.add_comment, size: 26),

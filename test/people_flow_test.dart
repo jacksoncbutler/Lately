@@ -211,9 +211,9 @@ void main() {
       await pumpApp(tester);
       await tester.tap(find.byKey(const Key('browse-everyone')));
       await settle(tester);
-      expect(find.textContaining('Lisbon · 2:10 pm there'), findsOneWidget);
-      expect(find.textContaining('Dubai · 6:10 pm there'), findsOneWidget);
-      expect(find.textContaining('Auckland · 3:10 am there'), findsOneWidget);
+      expect(find.textContaining('· 2:10 pm there'), findsOneWidget); // Lisbon
+      expect(find.textContaining('· 6:10 pm there'), findsOneWidget); // Dubai
+      expect(find.textContaining('· 3:10 am there'), findsOneWidget); // Auckland (next day)
     });
 
     testApp('bulk add: pick contacts, one group for all, then finish each person separately', (tester) async {
@@ -228,6 +228,8 @@ void main() {
       await pumpApp(tester);
       await tester.tap(find.byKey(const Key('browse-everyone')));
       await settle(tester);
+      await tester.tap(find.byKey(const Key('add-menu')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Add from contacts'));
       await settle(tester);
       expect(contacts.requested, 1);
@@ -261,7 +263,7 @@ void main() {
       expect(find.text('Finish setup for Alex'), findsOneWidget);
       final finish = find.widgetWithText(FilledButton, 'Finish setup');
       expect(tester.widget<FilledButton>(finish).onPressed, isNull);
-      await tester.enterText(find.byType(TextField), 'sydney');
+      await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'sydney');
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('Sydney'));
       await tester.pumpAndSettle();

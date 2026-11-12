@@ -106,3 +106,15 @@ String weekdayDate(DateTime d) =>
 String aboutDuration(int minutes) => minutes >= 60
     ? 'about ${(minutes / 60).round()} ${(minutes / 60).round() == 1 ? 'hour' : 'hours'}'
     : 'about $minutes ${minutes == 1 ? 'minute' : 'minutes'}';
+
+/// "8:00 am" for minutes since midnight.
+String clockLabel(int minutes) {
+  final h = (minutes ~/ 60) % 24;
+  final m = minutes % 60;
+  final h12 = h % 12 == 0 ? 12 : h % 12;
+  return '$h12:${m.toString().padLeft(2, '0')} ${h < 12 ? 'am' : 'pm'}';
+}
+
+/// "08:00" as stored.
+String clockStored(int minutes) =>
+    '${(minutes ~/ 60).toString().padLeft(2, '0')}:${(minutes % 60).toString().padLeft(2, '0')}';

@@ -98,3 +98,12 @@ class SuggestedPersonNotifier extends Notifier<String?> {
 
 final suggestedPersonProvider =
     NotifierProvider<SuggestedPersonNotifier, String?>(SuggestedPersonNotifier.new);
+
+/// Which tab is showing: 0 Home, 1 People, 2 Dates.
+class TabIndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void set(int i) => state = i;
+}
+
+final tabIndexProvider = NotifierProvider<TabIndexNotifier, int>(TabIndexNotifier.new);

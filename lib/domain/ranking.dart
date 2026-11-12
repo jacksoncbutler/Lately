@@ -294,9 +294,13 @@ class UpcomingDate {
     required this.month,
     required this.day,
     required this.personId,
+    this.turns,
   });
   final String label;
   final String sub;
+
+  /// The age they turn, only when the birth year is known.
+  final int? turns;
 
   /// 0 = today.
   final int days;
@@ -350,23 +354,32 @@ List<UpcomingDate> upcoming(List<DateSource> sources, DateTime now, String zone,
     return DateTime.utc(year, month, d);
   }
 
-  void addYearly(String label, String sub, String? date, String personId) {
+  void addYearly(String label, String sub, String? date, String personId, {bool birthday = false}) {
     final md = _monthDay(date);
     if (md == null) return;
+    final birthYear = birthday ? int.tryParse(RegExp(r'^(\d{4})-').firstMatch(date!)?.group(1) ?? '') : null;
     var c = occurrence(md.month, md.day, t.year);
     if (c.isBefore(today)) c = occurrence(md.month, md.day, t.year + 1);
     final days = c.difference(today).inDays;
     if (days <= limitDays) {
       out.add(UpcomingDate(
-          label: label, sub: sub, days: days, year: c.year, month: c.month, day: c.day, personId: personId));
+          label: label,
+          sub: sub,
+          days: days,
+          year: c.year,
+          month: c.month,
+          day: c.day,
+          personId: personId,
+          turns: birthYear == null ? null : c.year - birthYear));
     }
   }
 
   for (final p in sources) {
     if (p.archived) continue;
-    addYearly("${p.name}'s birthday", '', p.birthday, p.personId);
+    addYearly("${p.name}'s birthday", '', p.birthday, p.personId, birthday: true);
     for (final r in p.relationships) {
-      addYearly("${r.name}'s birthday", "${p.name}'s ${r.relation ?? 'person'}", r.birthday, p.personId);
+      addYearly("${r.name}'s birthday", "${p.name}'s ${r.relation ?? 'person'}", r.birthday, p.personId,
+          birthday: true);
     }
     for (final d in p.importantDates) {
       final full = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(d.date);

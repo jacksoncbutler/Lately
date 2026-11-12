@@ -17,11 +17,9 @@ import '../../ui/theme.dart';
 import '../log/log_sheet.dart';
 import '../people/add_person_screen.dart';
 import '../people/bulk_add_screen.dart';
-import '../people/people_screen.dart';
 import '../profile/profile_screen.dart';
 import '../profile/reach_sheet.dart';
 import '../settings/settings_screen.dart';
-import '../setup/setup_screen.dart';
 import 'home_data.dart';
 
 /// Home: one person to talk to, a time-available preference, and what is
@@ -71,12 +69,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
-    final setup = ref.watch(setupCompleteProvider);
-    if (setup.value == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (setup.value == false) return const SetupScreen();
-
     final people = ref.watch(peopleProvider).value;
     final chats = ref.watch(allChatsProvider).value;
     final groups = ref.watch(groupsProvider).value;
@@ -271,8 +263,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ?.copyWith(letterSpacing: 0.9, fontWeight: FontWeight.w600)),
       );
 
-  void _browse() => Navigator.of(context)
-      .push(MaterialPageRoute<void>(builder: (_) => const PeopleScreen()));
+  void _browse() => ref.read(tabIndexProvider.notifier).set(1);
 
   void _openProfile(String id) => Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ProfileScreen(personId: id, backLabel: 'Home')));

@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/backup/backup_codec.dart';
 import '../../data/backup/backup_models.dart';
 import '../../data/providers.dart';
+import 'settings_sections.dart';
 
-/// Minimal Settings (build step 3): backup only. Groups, block order and the
-/// awake window are added here in step 8.
+/// Settings: groups and intervals, profile block order, awake hours, and backup.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -203,6 +203,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 8),
             TextButton(onPressed: _busy ? null : _undo, child: const Text('Undo last import')),
           ],
+          const Divider(height: 40),
+          const GroupsSection(),
+          const Divider(height: 32),
+          const BlockOrderSection(),
+          const Divider(height: 32),
+          const AwakeSection(),
         ],
       ),
     );

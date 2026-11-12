@@ -48,3 +48,11 @@ CI and release builds pin Flutter 3.47.9 (`flutter-version` in `.github/workflow
 - Home re-evaluates every minute and on return to the foreground, like the prototype: it does not keep a person "sticky". When the person shown stops being eligible, or someone more overdue becomes available, it moves on and says why (not when you caused the change yourself).
 - "Today" and "midnight" use this phone's timezone; the awake window uses each person's own timezone and the global window in settings.
 - `suggestedPersonProvider` carries the person Home shows to the log popup (default person and the "Suggested" tag).
+
+## Step 8 notes
+
+- `lib/features/shell/app_shell.dart` shows first-run setup, then three tabs in an `IndexedStack` (each tab keeps its place). Profiles open as full-screen pages over the tabs, labelled with the tab they came from. `tabIndexProvider` switches tabs from code (Home's "Browse everyone").
+- Adding people is one plus in the People app bar (`lib/ui/add_people_menu.dart`) that opens "Add someone" and "Add from contacts". The empty-app welcome on Home still shows both as buttons, since it is the only thing on that screen.
+- People (grouped, searchable, status tags, Archived), Dates (12 months, ages when the birth year is known) and the Settings sections (groups and intervals, profile block order, awake hours; Backup stays first) read from the same data as Home, so changing a group interval or the awake window changes Home immediately.
+- A group with people (archived ones included) cannot be removed, and the last group cannot be removed.
+- Floating buttons on Home and People both stay in the tree, so `LogFab` uses `heroTag: null`; a shared hero tag crashes page transitions.

@@ -4,75 +4,177 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../data/repository.dart';
+import '../../domain/chat_rules.dart';
+import '../../domain/ranking.dart';
 import '../../domain/timezones.dart';
+import '../../ui/add_people_menu.dart';
 import '../../ui/log_fab.dart';
+import '../../ui/theme.dart';
+import '../home/home_data.dart';
 import '../profile/finish_setup_sheet.dart';
 import '../profile/profile_screen.dart';
-import 'add_person_screen.dart';
-import 'bulk_add_screen.dart';
 
-/// Minimal People list for build steps 4 and 5 (add people, open profiles).
-/// Search, grouping by group and the tab itself arrive in step 8.
-class PeopleScreen extends ConsumerWidget {
+const _statusLabels = {
+  PersonStatus.asleep: 'Asleep',
+  PersonStatus.today: 'Talked today',
+  PersonStatus.notDue: 'Not due',
+  PersonStatus.snoozed: 'Snoozed',
+  PersonStatus.skipped: 'Skipped',
+};
+
+/// Searchable list of everyone, grouped by group, with how long since you last
+/// talked and their local time. Archived people sit in a collapsed section.
+class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PeopleScreen> createState() => _PeopleScreenState();
+}
+
+class _PeopleScreenState extends ConsumerState<PeopleScreen> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
     final people = ref.watch(peopleProvider).value ?? const <PersonRow>[];
     final archived = ref.watch(archivedPeopleProvider).value ?? const <PersonRow>[];
-    final groups = {for (final g in ref.watch(groupsProvider).value ?? <GroupRow>[]) g.id: g.name};
-    final now = ref.watch(nowProvider);
+    final groups = ref.watch(groupsProvider).value ?? const <GroupRow>[];
+    final chats = ref.watch(allChatsProvider).value ?? const <ChatRow>[];
+    final settings = ref.watch(settingsProvider).value;
+    final zone = ref.watch(userZoneProvider).value;
+    final nowFn = ref.watch(nowProvider);
+    final now = nowFn();
+    final c = LatelyColors.of(context);
+    final t = Theme.of(context).textTheme;
 
-    Widget tile(PersonRow p) => ListTile(
-          key: Key('person-${p.id}'),
-          title: Text(p.displayName),
-          subtitle: Text(needsFinishing(p)
-              ? groups[p.groupId] ?? ''
-              : '${groups[p.groupId] ?? ''} · ${zoneLabel(p.timezone)} · ${clockText(p.timezone, now())} there'),
-          trailing: needsFinishing(p)
-              ? const Chip(label: Text('Finish setup'), visualDensity: VisualDensity.compact)
-              : const Icon(Icons.chevron_right),
-          onTap: () => _open(context, p),
-        );
+    final rows = <String, RankRow>{};
+    if (settings != null && zone != null) {
+      for (final r in rank(buildRankPeople(people: people, chats: chats, groups: groups), now,
+          rankSettingsFrom(settings, zone))) {
+        rows[r.person.id] = r;
+      }
+    }
+
+    final q = _query.trim().toLowerCase();
+    bool match(PersonRow p) => q.isEmpty || p.displayName.toLowerCase().contains(q);
+    final shown = people.where(match).toList();
+    final shownArchived = archived.where(match).toList();
+
+    Widget tile(PersonRow p) {
+      final r = rows[p.id];
+      final unfinished = needsFinishing(p);
+      final sub = unfinished
+          ? 'Finish setup to get suggestions'
+          : '${r == null ? '' : 'Last talked ${agoText(r.days)} · '}${clockText(p.timezone, now)} there';
+      final status = (r == null || unfinished) ? null : _statusLabels[r.status];
+      return ListTile(
+        key: Key('person-${p.id}'),
+        leading: CircleAvatar(
+          backgroundColor: c.accent,
+          foregroundColor: c.onAccent,
+          child: Text(p.displayName.characters.first.toUpperCase()),
+        ),
+        title: Text(p.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(sub),
+        trailing: unfinished
+            ? const Chip(label: Text('Finish setup'), visualDensity: VisualDensity.compact)
+            : (status == null ? null : _Tag(status)),
+        onTap: () => _open(context, p),
+      );
+    }
+
+    // Longest since you talked first; people still to finish go last.
+    int byDays(PersonRow a, PersonRow b) {
+      final ra = rows[a.id], rb = rows[b.id];
+      if (ra == null && rb == null) return a.displayName.compareTo(b.displayName);
+      if (ra == null) return 1;
+      if (rb == null) return -1;
+      return rb.days.compareTo(ra.days);
+    }
+
+    final sections = <Widget>[];
+    for (final g in groups) {
+      final members = shown.where((p) => p.groupId == g.id).toList()..sort(byDays);
+      if (members.isEmpty) continue;
+      sections.add(Padding(
+        padding: const EdgeInsets.only(top: 16, bottom: 6),
+        child: Text('${g.name} · every ${g.defaultIntervalDays} days'.toUpperCase(),
+            style: t.labelSmall?.copyWith(letterSpacing: 0.9, fontWeight: FontWeight.w600)),
+      ));
+      sections.add(Card(
+        child: Column(children: [
+          for (var i = 0; i < members.length; i++) ...[
+            if (i > 0) const Divider(),
+            tile(members[i]),
+          ],
+        ]),
+      ));
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('People')),
+      appBar: AppBar(
+        title: const Text('People',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+        actions: const [AddPeopleMenu()],
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: people.isEmpty ? null : const LogFab(),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-          child: Row(children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => _bulk(context),
-                child: const Text('Add from contacts'),
-              ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 110),
+        children: [
+          TextField(
+            key: const Key('people-search'),
+            decoration: const InputDecoration(
+              hintText: 'Search people',
+              prefixIcon: Icon(Icons.search),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const AddPersonScreen())),
-                child: const Text('Add someone'),
-              ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+          if (people.isEmpty && archived.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 48),
+              child: Center(child: Text('No one yet. Tap + to add people.')),
+            )
+          else if (shown.isEmpty && shownArchived.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 48),
+              child: Center(child: Text('No one matches that search.')),
             ),
-          ]),
-        ),
-        Expanded(
-          child: people.isEmpty && archived.isEmpty
-              ? const Center(child: Text('No one yet.'))
-              : ListView(padding: const EdgeInsets.only(bottom: 96), children: [
-                  for (final p in people) ...[tile(p), const Divider(height: 1)],
-                  if (archived.isNotEmpty)
-                    ExpansionTile(
-                      key: const Key('archived-section'),
-                      title: Text('Archived (${archived.length})'),
-                      children: [for (final p in archived) tile(p)],
+          ...sections,
+          if (shownArchived.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: const Key('archived-section'),
+                  tilePadding: EdgeInsets.zero,
+                  title: Text('Archived (${shownArchived.length})',
+                      style: TextStyle(color: c.muted, fontWeight: FontWeight.w600)),
+                  children: [
+                    Card(
+                      child: Column(children: [
+                        for (final p in shownArchived)
+                          ListTile(
+                            key: Key('person-${p.id}'),
+                            leading: CircleAvatar(
+                              backgroundColor: c.soft,
+                              foregroundColor: c.muted,
+                              child: Text(p.displayName.characters.first.toUpperCase()),
+                            ),
+                            title: Text(p.displayName,
+                                style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: const Text('Archived'),
+                            onTap: () => _open(context, p),
+                          ),
+                      ]),
                     ),
-                ]),
-        ),
-      ]),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -86,13 +188,20 @@ class PeopleScreen extends ConsumerWidget {
     await Navigator.of(context).push(
         MaterialPageRoute<void>(builder: (_) => ProfileScreen(personId: p.id)));
   }
+}
 
-  Future<void> _bulk(BuildContext context) async {
-    final n = await Navigator.of(context)
-        .push<int>(MaterialPageRoute(builder: (_) => const BulkAddScreen()));
-    if (n != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added $n. Tap anyone to finish their setup.')));
-    }
+class _Tag extends StatelessWidget {
+  const _Tag(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = LatelyColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(color: c.soft, borderRadius: BorderRadius.circular(10)),
+      child: Text(text,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.muted)),
+    );
   }
 }

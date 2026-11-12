@@ -10,7 +10,7 @@ import 'app_config.dart';
 import 'data/providers.dart';
 import 'data/safe_open.dart';
 import 'domain/timezones.dart';
-import 'features/home/home_screen.dart';
+import 'features/shell/app_shell.dart';
 import 'ui/theme.dart';
 
 Future<void> main() async {
@@ -50,7 +50,7 @@ class LatelyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: latelyThemeFor(Brightness.light),
       darkTheme: latelyThemeFor(Brightness.dark),
-      home: const HomeScreen(),
+      home: const AppShell(),
     );
   }
 }
