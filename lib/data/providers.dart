@@ -74,3 +74,27 @@ final customBlocksProvider = StreamProvider<List<CustomBlockRow>>(
 
 final settingsProvider = StreamProvider<AppSettings>(
     (ref) => ref.watch(repositoryProvider).watchSettings());
+
+final allChatsProvider = StreamProvider<List<ChatRow>>(
+    (ref) => ref.watch(repositoryProvider).watchAllChats());
+
+final allRelationshipsProvider = StreamProvider<List<RelationshipRow>>(
+    (ref) => ref.watch(repositoryProvider).watchAllRelationships());
+
+final allImportantDatesProvider = StreamProvider<List<ImportantDateRow>>(
+    (ref) => ref.watch(repositoryProvider).watchAllImportantDates());
+
+/// This phone's timezone: "today" and "midnight" are measured in it.
+final userZoneProvider =
+    FutureProvider<String>((ref) => ref.watch(deviceTimezoneProvider).current());
+
+/// The person Home is showing right now (set by Home). The log popup starts on
+/// them when nobody else was chosen.
+class SuggestedPersonNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? id) => state = id;
+}
+
+final suggestedPersonProvider =
+    NotifierProvider<SuggestedPersonNotifier, String?>(SuggestedPersonNotifier.new);

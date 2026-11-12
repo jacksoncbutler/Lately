@@ -32,23 +32,29 @@ Future<void> showLogSheet(BuildContext context, {String? personId}) async {
       candidates: candidates,
       recentContactPersonId: s.recentContactPersonId,
       recentContactAt: s.recentContactAt,
+      suggestedPersonId: container.read(suggestedPersonProvider),
       now: now,
     );
   }
   if (id == null || !context.mounted) return;
+  final suggested = container.read(suggestedPersonProvider) ?? id;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     builder: (_) => FractionallySizedBox(
       heightFactor: 0.94,
-      child: LogSheet(initialPersonId: id!),
+      child: LogSheet(initialPersonId: id!, suggestedPersonId: suggested),
     ),
   );
 }
 
 class LogSheet extends ConsumerStatefulWidget {
-  const LogSheet({super.key, required this.initialPersonId});
+  const LogSheet({super.key, required this.initialPersonId, String? suggestedPersonId})
+      : suggestedPersonId = suggestedPersonId ?? initialPersonId;
   final String initialPersonId;
+
+  /// Tagged "Suggested" in the person list: who Home is showing.
+  final String suggestedPersonId;
 
   @override
   ConsumerState<LogSheet> createState() => _LogSheetState();
@@ -139,7 +145,7 @@ class _LogSheetState extends ConsumerState<LogSheet> {
         _header(context, 'Who did you talk to?'),
         Expanded(
           child: PersonPicker(
-            suggestedId: widget.initialPersonId,
+            suggestedId: widget.suggestedPersonId,
             onPick: _choosePerson,
             onBack: () => setState(() => _picking = false),
           ),

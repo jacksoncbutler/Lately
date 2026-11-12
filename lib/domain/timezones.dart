@@ -135,3 +135,28 @@ List<CityMatch> searchCities(String query, {int limit = 6}) {
   });
   return [for (final e in scored.take(limit)) e.$2];
 }
+
+/// Calendar date (year, month, day) in [zone] at [instant].
+({int year, int month, int day}) calendarDate(String zone, DateTime instant) {
+  ensureTimezonesLoaded();
+  final loc = isValidZone(zone) ? tz.getLocation(zone) : tz.UTC;
+  final t = tz.TZDateTime.from(instant, loc);
+  return (year: t.year, month: t.month, day: t.day);
+}
+
+/// Minutes since midnight in [zone] at [instant].
+int minutesOfDay(String zone, DateTime instant) {
+  ensureTimezonesLoaded();
+  final loc = isValidZone(zone) ? tz.getLocation(zone) : tz.UTC;
+  final t = tz.TZDateTime.from(instant, loc);
+  return t.hour * 60 + t.minute;
+}
+
+/// The next midnight in [zone] after [now], as a UTC instant. Daylight saving
+/// comes from the database, so the gap is 23 or 25 hours on those days.
+DateTime nextLocalMidnight(String zone, DateTime now) {
+  ensureTimezonesLoaded();
+  final loc = isValidZone(zone) ? tz.getLocation(zone) : tz.UTC;
+  final t = tz.TZDateTime.from(now, loc);
+  return tz.TZDateTime(loc, t.year, t.month, t.day + 1).toUtc();
+}

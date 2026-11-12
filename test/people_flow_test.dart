@@ -209,7 +209,7 @@ void main() {
       await repo.createPerson(displayName: 'Noor', groupId: g, timezone: 'Asia/Dubai', contactMethodType: 'text', timezoneConfirmed: true);
       await repo.createPerson(displayName: 'Ruth', groupId: g, timezone: 'Pacific/Auckland', contactMethodType: 'text', timezoneConfirmed: true);
       await pumpApp(tester);
-      await tester.tap(find.widgetWithText(FilledButton, 'People'));
+      await tester.tap(find.byKey(const Key('browse-everyone')));
       await settle(tester);
       expect(find.textContaining('Lisbon · 2:10 pm there'), findsOneWidget);
       expect(find.textContaining('Dubai · 6:10 pm there'), findsOneWidget);
@@ -226,7 +226,7 @@ void main() {
       final g = (await repo.listGroups()).first.id;
       await repo.createPerson(displayName: 'Mom', groupId: g, timezone: 'America/Chicago', contactMethodType: 'call', contactMethodValue: '+1 555 0100', phone: '+1 555 0100', timezoneConfirmed: true);
       await pumpApp(tester);
-      await tester.tap(find.widgetWithText(FilledButton, 'People'));
+      await tester.tap(find.byKey(const Key('browse-everyone')));
       await settle(tester);
       await tester.tap(find.text('Add from contacts'));
       await settle(tester);
@@ -284,7 +284,7 @@ void main() {
       await repo.createPeople([(displayName: 'Jo', phone: null)],
           groupId: g, timezone: 'America/Chicago', timezoneConfirmed: false);
       await pumpApp(tester);
-      await tester.tap(find.widgetWithText(FilledButton, 'People'));
+      await tester.tap(find.byKey(const Key('browse-everyone')));
       await settle(tester);
       await tester.tap(find.text('Jo'));
       await settle(tester);

@@ -191,7 +191,7 @@ When a person has no chats, 30 minutes is counted. The last-talked answer at onb
 
 **Skip and snooze**
 
-- Skip hides that person until midnight local time, then they return at the same rank. They come back sooner if every other eligible person has already been contacted that day (a skipped person is the fallback before showing You're caught up).
+- Skip hides that person until midnight local time, then they return at the same rank. They come back sooner only once someone else has been talked to today and nobody else is left to show, so "Not today" always visibly does something (with nobody else at all, Home says Nobody to suggest).
 - Snooze hides them for 7 days by default, and the user can pick another date.
 
 **Why line**

@@ -15,6 +15,12 @@ class Tune {
   static const awakeStartHour = 8;
   static const awakeEndHour = 22;
   static const snoozeDays = 7;
+
+  /// Group priority weights are all 1.0 in version 1; tune after real use.
+  static const defaultGroupWeight = 1.0;
+
+  /// Birthdays and dates within this many days show on Home.
+  static const homeDatesDays = 14;
   static const groupIntervalDays = {'parents': 14, 'siblings': 21, 'friends': 30};
   /// "Roughly when did you last talk?" answers, in days ago.
   static const lastTalkedChoices = [

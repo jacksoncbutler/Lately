@@ -62,12 +62,13 @@ class LogCandidate {
 }
 
 /// Who the log popup starts on when nobody was chosen: the person you just
-/// tapped Contact for (within [Tune.recentContactHours]), else the most
-/// overdue person. (Home's real hero card replaces the fallback in step 7.)
+/// tapped Contact for (within [Tune.recentContactHours]), else the person Home
+/// is suggesting, else the most overdue person.
 String? defaultLogPersonId({
   required List<LogCandidate> candidates,
   String? recentContactPersonId,
   DateTime? recentContactAt,
+  String? suggestedPersonId,
   required DateTime now,
 }) {
   if (candidates.isEmpty) return null;
@@ -76,6 +77,9 @@ String? defaultLogPersonId({
       now.difference(recentContactAt) < const Duration(hours: Tune.recentContactHours) &&
       candidates.any((c) => c.id == recentContactPersonId)) {
     return recentContactPersonId;
+  }
+  if (suggestedPersonId != null && candidates.any((c) => c.id == suggestedPersonId)) {
+    return suggestedPersonId;
   }
   final sorted = [...candidates]..sort((a, b) {
       final r = b.ratio.compareTo(a.ratio);

@@ -95,3 +95,14 @@ String? dialableNumber(String? value) {
   if (RegExp(r'[A-Za-z@]').hasMatch(v)) return null;
   return (v.startsWith('+') ? '+' : '') + digits;
 }
+
+const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/// "Sat, Nov 14" for a calendar date.
+String weekdayDate(DateTime d) =>
+    '${_weekdays[d.weekday - 1]}, ${monthNames[d.month - 1]} ${d.day}';
+
+/// "about 3 hours" or "about 40 minutes".
+String aboutDuration(int minutes) => minutes >= 60
+    ? 'about ${(minutes / 60).round()} ${(minutes / 60).round() == 1 ? 'hour' : 'hours'}'
+    : 'about $minutes ${minutes == 1 ? 'minute' : 'minutes'}';

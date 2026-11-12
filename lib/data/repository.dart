@@ -507,6 +507,28 @@ class Repository {
   Stream<AppSettings> watchSettings() =>
       (db.select(db.settings)..where((t) => t.id.equals(settingsId))).watchSingle();
 
+  Stream<List<ChatRow>> watchAllChats() =>
+      (db.select(db.chats)..where((t) => t.deletedAt.isNull())).watch();
+
+  Stream<List<RelationshipRow>> watchAllRelationships() =>
+      (db.select(db.relationships)..where((t) => t.deletedAt.isNull())).watch();
+
+  Stream<List<ImportantDateRow>> watchAllImportantDates() =>
+      (db.select(db.importantDates)..where((t) => t.deletedAt.isNull())).watch();
+
+  /// Hide a person from Home until [until] (the next local midnight).
+  Future<void> skipUntil(String personId, DateTime until) =>
+      updatePerson(personId, PeopleCompanion(skippedUntil: Value(until.toUtc())));
+
+  Future<void> clearSkip(String personId) =>
+      updatePerson(personId, const PeopleCompanion(skippedUntil: Value(null)));
+
+  Future<void> snoozeUntil(String personId, DateTime until) =>
+      updatePerson(personId, PeopleCompanion(snoozedUntil: Value(until.toUtc())));
+
+  Future<void> clearSnooze(String personId) =>
+      updatePerson(personId, const PeopleCompanion(snoozedUntil: Value(null)));
+
   Future<void> undeleteRelationship(String id) =>
       updateRelationship(id, const RelationshipsCompanion(deletedAt: Value(null)));
 

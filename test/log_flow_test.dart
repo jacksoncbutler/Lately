@@ -79,7 +79,7 @@ void main() {
 
   /// Home -> People -> a profile.
   Future<void> openProfile(WidgetTester tester, String name) async {
-    await tester.tap(find.widgetWithText(FilledButton, 'People'));
+    await tester.tap(find.byKey(const Key('browse-everyone')));
     await settle(tester);
     await tester.tap(find.text(name));
     await settle(tester);
@@ -471,7 +471,7 @@ void main() {
     testApp('the button shows on Home and People, not on a profile or an empty app', (tester) async {
       await pumpApp(tester);
       expect(find.byKey(const Key('log-fab')), findsOneWidget); // Home
-      await tester.tap(find.widgetWithText(FilledButton, 'People'));
+      await tester.tap(find.byKey(const Key('browse-everyone')));
       await settle(tester);
       expect(find.byKey(const Key('log-fab')), findsOneWidget); // People
       await tester.tap(find.text('Sam'));
