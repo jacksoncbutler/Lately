@@ -166,7 +166,8 @@ class _SwipeLineState extends State<SwipeLine> {
 /// Shows an Undo bar after a delete, the same everywhere.
 void showUndoBar(BuildContext context, String message, VoidCallback onUndo) {
   final m = ScaffoldMessenger.of(context);
-  m.hideCurrentSnackBar();
+  // Newest message wins: drop anything still queued behind the current one.
+  m.clearSnackBars();
   m.showSnackBar(SnackBar(
     content: Text(message),
     action: SnackBarAction(label: 'Undo', onPressed: onUndo),

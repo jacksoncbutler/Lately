@@ -245,6 +245,29 @@ void main() {
       expect(pickHero(rank([skipped, asleep, notDue], now, utc), TimeChip.any).row, isNull);
     });
 
+    test('skip everyone, even with someone talked to today: nobody comes back early', () {
+      final until = nextLocalMidnight('UTC', now);
+      final people = [
+        person('A', chats: [chat(60)], skippedUntil: until),
+        person('B', chats: [chat(50)], skippedUntil: until),
+        person('C', chats: [chat(40)], skippedUntil: until),
+        person('Done', chats: [chat(0)]),
+      ];
+      final rows = rank(people, now, utc);
+      expect(rows.where((r) => r.skipEligible), hasLength(3));
+      expect(pickHero(rows, TimeChip.any).row, isNull);
+    });
+
+    test('with two skipped and everyone else talked to, neither comes back (each has another waiting)', () {
+      final until = nextLocalMidnight('UTC', now);
+      final people = [
+        person('A', chats: [chat(60)], skippedUntil: until),
+        person('B', chats: [chat(50)], skippedUntil: until),
+        person('Done', chats: [chat(0)]),
+      ];
+      expect(pickHero(rank(people, now, utc), TimeChip.any).row, isNull);
+    });
+
     test('a skipped person who is asleep, snoozed or not due does not come back early', () {
       final until = nextLocalMidnight('UTC', now);
       final asleep = person('A', zone: 'Asia/Tokyo', chats: [chat(120)], skippedUntil: until);

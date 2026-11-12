@@ -116,11 +116,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           if (!mounted) return;
           ref.read(suggestedPersonProvider.notifier).set(newId);
           if (announce && newName != null) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(wasAsleep
-                  ? '$prevName is outside their awake hours, so Home moved on to $newName.'
-                  : 'Home moved on to $newName.'),
-            ));
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(SnackBar(
+                content: Text(wasAsleep
+                    ? '$prevName is outside their awake hours, so Home moved on to $newName.'
+                    : 'Home moved on to $newName.'),
+              ));
           }
         });
       }
@@ -177,7 +179,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           _acted = true;
                           showLogSheet(context, personId: hero.row!.person.id);
                         },
-                        onSkip: () => _skip(hero.row!.person, zone, now),
+                        onSkip: () => _skip(hero.row!.person, zone, now, alreadySkipped: hero.fromSkipped),
                         onSnooze: () => _snooze(hero.row!.person, now),
                       )
                     else
@@ -275,11 +277,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void _openProfile(String id) => Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ProfileScreen(personId: id, backLabel: 'Home')));
 
-  Future<void> _skip(RankPerson p, String zone, DateTime now) async {
+  Future<void> _skip(RankPerson p, String zone, DateTime now, {required bool alreadySkipped}) async {
     _acted = true;
-    await repo.skipUntil(p.id, nextLocalMidnight(zone, now));
-    if (mounted) {
-      showUndoBar(context, 'Skipped until tomorrow', () => repo.clearSkip(p.id));
+    final until = nextLocalMidnight(zone, now);
+    if (alreadySkipped) {
+      // They came back early after being skipped. Sending them away again
+      // must change the card, so they are held until tomorrow like a snooze.
+      await repo.snoozeUntil(p.id, until);
+      if (mounted) {
+        showUndoBar(context, 'Skipped until tomorrow', () => repo.clearSnooze(p.id));
+      }
+    } else {
+      await repo.skipUntil(p.id, until);
+      if (mounted) {
+        showUndoBar(context, 'Skipped until tomorrow', () => repo.clearSkip(p.id));
+      }
     }
   }
 
@@ -481,6 +493,7 @@ class _CaughtUpCard extends StatelessWidget {
     final asleep = rows.where((r) => r.status == PersonStatus.asleep).toList()
       ..sort((a, b) => wakeInMinutes(a.person, now, settings)
           .compareTo(wakeInMinutes(b.person, now, settings)));
+    final skipped = rows.any((r) => r.status == PersonStatus.skipped);
     final calm = rows.any((r) => r.status == PersonStatus.notDue || r.status == PersonStatus.today);
 
     final String title;
@@ -489,6 +502,9 @@ class _CaughtUpCard extends StatelessWidget {
       title = 'Nobody is free right now';
       body =
           '${asleep.first.person.name} wakes in ${aboutDuration(wakeInMinutes(asleep.first.person, now, settings))}.';
+    } else if (skipped) {
+      title = "That's everyone for today";
+      body = 'Everyone left is skipped or snoozed. Skipped people come back tomorrow.';
     } else if (calm) {
       title = "You're caught up";
       body = 'Nobody is due right now. Enjoy the quiet, or browse everyone.';

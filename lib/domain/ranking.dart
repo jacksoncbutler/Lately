@@ -215,14 +215,20 @@ class HeroPick {
 /// The one person to show. The time chip is a soft preference: someone who
 /// does not fit has their score multiplied by the chip penalty, so a very
 /// overdue person can still win. A person skipped today comes back sooner
-/// than tomorrow only once everyone else who could be shown has already been
-/// talked to today (so "Not today" always visibly does something).
+/// than tomorrow only once every other eligible person has been talked to
+/// today (so skipping everyone ends in "that's everyone for today").
 HeroPick pickHero(List<RankRow> rows, TimeChip chip) {
   var pool = rows.where((r) => r.status == PersonStatus.ok).toList();
   var fromSkipped = false;
-  if (pool.isEmpty && rows.any((r) => r.status == PersonStatus.today)) {
-    pool = rows.where((r) => r.skipEligible).toList();
-    fromSkipped = pool.isNotEmpty;
+  if (pool.isEmpty) {
+    // A skipped person returns before tomorrow only when every other eligible
+    // person has been talked to today: exactly one person is skipped and
+    // somebody else was contacted. Skip everyone and Home says you are done.
+    final skipped = rows.where((r) => r.skipEligible).toList();
+    if (skipped.length == 1 && rows.any((r) => r.status == PersonStatus.today)) {
+      pool = skipped;
+      fromSkipped = true;
+    }
   }
   if (pool.isEmpty) return const HeroPick();
   RankRow? best;

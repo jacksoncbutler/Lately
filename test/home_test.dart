@@ -296,13 +296,13 @@ void main() {
       expect(heroName('Sam'), findsOneWidget);
     });
 
-    testApp('with nobody else, Not today ends the day for them: caught up, not the same card again', (tester) async {
+    testApp('with nobody else, Not today ends the day for them: finished, not the same card again', (tester) async {
       await add('Only', daysAgo: 60);
       await pumpHome(tester);
       await tester.tap(find.byKey(const Key('hero-skip')));
       await settle(tester);
       expect(find.byKey(const Key('hero-card')), findsNothing);
-      expect(text(tester, 'caught-up-title'), 'Nobody to suggest');
+      expect(text(tester, 'caught-up-title'), "That's everyone for today");
     });
 
     testApp('a skipped person comes back sooner once everyone else has been talked to today', (tester) async {
@@ -317,6 +317,58 @@ void main() {
       await settle(tester);
       expect(heroName('Sam'), findsOneWidget);
       expect((await repo.getPerson(sam))!.skippedUntil, isNotNull); // still marked skipped
+    });
+
+    testApp('skipping everyone ends in a finished card, even if you talked to someone today', (tester) async {
+      await add('Ann', daysAgo: 60);
+      await add('Bea', daysAgo: 50);
+      await add('Cy', daysAgo: 40);
+      final done = await add('Dee', daysAgo: 45);
+      await repo.logChat(personId: done, occurredAt: clock, type: 'call', depth: 'deep', durationMinutes: 20);
+      await pumpHome(tester);
+      for (final n in ['Ann', 'Bea', 'Cy']) {
+        expect(heroName(n), findsOneWidget, reason: 'expected $n next');
+        await tester.tap(find.byKey(const Key('hero-skip')));
+        await settle(tester);
+      }
+      // Everyone left was skipped and nobody else is left to talk to.
+      expect(find.byKey(const Key('hero-card')), findsNothing);
+      expect(find.byKey(const Key('caught-up-card')), findsOneWidget);
+      expect(text(tester, 'caught-up-title'), "That's everyone for today");
+    });
+
+    testApp('Not today always changes the card: it never shows the same person again', (tester) async {
+      final a = await add('Ann', daysAgo: 60);
+      await add('Bea', daysAgo: 50);
+      final done = await add('Dee', daysAgo: 45);
+      await repo.logChat(personId: done, occurredAt: clock, type: 'call', depth: 'deep', durationMinutes: 20);
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('hero-skip'))); // Ann
+      await settle(tester);
+      expect(heroName('Bea'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('hero-skip'))); // Bea
+      await settle(tester);
+      expect(find.byKey(const Key('hero-card')), findsNothing);
+      expect((await repo.getPerson(a))!.skippedUntil, isNotNull);
+    });
+
+    testApp('a person who comes back early can be sent away again, with Undo', (tester) async {
+      final sam = await add('Sam', daysAgo: 60);
+      final bo = await add('Bo', daysAgo: 40);
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('hero-skip'))); // skip Sam
+      await settle(tester);
+      await repo.logChat(personId: bo, occurredAt: clock, type: 'call', depth: 'deep', durationMinutes: 20);
+      await settle(tester);
+      expect(heroName('Sam'), findsOneWidget); // everyone else has been talked to: back early
+      await tester.tap(find.byKey(const Key('hero-skip'))); // "Not today" again
+      await settle(tester);
+      expect(find.byKey(const Key('hero-card')), findsNothing); // does not show Sam again
+      expect(text(tester, 'caught-up-title'), "You're caught up"); // Bo talked to, Sam sent away
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect(heroName('Sam'), findsOneWidget);
+      expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
     });
 
     testApp('Snooze hides for seven days, with Undo, and they return after that', (tester) async {
