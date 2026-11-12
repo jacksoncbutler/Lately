@@ -13,6 +13,9 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
+          # Pinned to the version this code was checked with. An unpinned
+          # "stable" moved to a newer Flutter overnight and failed the analyzer.
+          flutter-version: '3.47.9'
           channel: stable
           cache: true
       - run: flutter pub get

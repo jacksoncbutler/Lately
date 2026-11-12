@@ -36,3 +36,7 @@ Temporary identity (name, icon, package id `net.butler.lately`) is in `lib/app_c
 - `Repository.logChat` saves a chat, links covered Next time items, stamps lines and people added in the popup, clears skip and snooze, and clears the recent-contact prompt, all in one transaction.
 - `ProfileBlocks` (lib/features/profile) is shared by the profile and the log popup, so the line rules cannot drift between screens. Tests that look inside the popup must scope finders to `LogSheet`, because the profile underneath has the same keys.
 - Chat deletion has no UI yet (edge case for step 9); `Repository.deleteChat` exists and last contact recomputes from the remaining chats.
+
+## Flutter version
+
+CI and release builds pin Flutter 3.47.9 (`flutter-version` in `.github/workflows`). An unpinned `stable` moved to 3.50.0 and its analyzer now flags `package:flutter/material.dart` as deprecated in favour of `package:material_ui`, which failed the build with no code change. Upgrading Flutter is a deliberate step: change the pin, migrate, run the tests, and install on the Pixel.
