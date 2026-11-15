@@ -24,7 +24,7 @@ These are settled unless marked otherwise; anything unsettled is under Open ques
 - Each person has a contact interval, default set by their group (parents, siblings, friends, plus custom groups). Group defaults are set during first setup and can be overridden per person.
 - Priority is how overdue someone is relative to their interval. Exact weighting will be tuned through use.
 - "Contact" means a real conversation. A like, a heart, or a quick one or two message exchange does not reset the clock. These can still be added as floating notes not tied to a chat.
-- Skipping someone on the home screen does not drop them; they come back. Snoozing is available. (Gut decision, to be revisited after real use.)
+- Skipping someone on the home screen (Not today) does not drop them; they come back tomorrow. "Didn't answer" keeps them out of Home for three hours, then puts them first until a chat is logged (fading after a week); it is not contact. A long pause is available per person under Manage on their profile (Pause suggestions until a date) and is not on Home. (Revisit whether the pause is wanted after real use.)
 - Timezone awareness is a must-have: the app avoids suggesting people who are likely asleep.
 - The app learns when people are usually reachable from the timing of logged chats. Manual availability entry is optional and not in the first version.
 
@@ -46,7 +46,7 @@ These are settled unless marked otherwise; anything unsettled is under Open ques
 **Home screen and navigation**
 
 - Three tabs: Home, People, Dates. Settings and defaults sit behind an icon on Home.
-- Home leads with one person: next time items, a Contact button (begin a conversation), a Log button (record one you already had; the two stack full width, with Not today and Snooze as small text links beneath), and a short why line (for example, "3 weeks overdue, usually a 20 minute catch-up").
+- Home leads with one person: next time items, a Contact button (begin a conversation), a Log button (record one you already had; the two stack full width, with Not today and Didn't answer as small text links beneath), and a short why line (for example, "3 weeks overdue, usually a 20 minute catch-up").
 - An optional time slider with four stops (Any, 15, 30, 60+) are a soft preference: they nudge the ranking toward people whose chats fit the time, but a very overdue person can still appear (A quick hello still counts). Anyone you already talked to today (calendar day, your timezone) is never suggested, nor anyone below a due floor of 0.6 of their interval; when nobody qualifies Home says You're caught up.
 - A slim dates strip under the card shows upcoming birthdays and important dates.
 
@@ -91,8 +91,8 @@ Version 1 is the smallest app that does the core loop: add people, see who to ta
 **3. Home**
 
 - One hero card: the most overdue person who is likely awake, was not talked to today, and is past the due floor; their next time items, Contact and Log buttons, and a why line. When nobody qualifies: You're caught up.
-- Live refresh: while the app is open, the card changes to the next best person if the person shown leaves their awake window or is skipped or snoozed.
-- Skip (they come back) and snooze.
+- Live refresh: while the app is open, the card changes to the next best person if the person shown leaves their awake window or is skipped or paused.
+- Not today (they come back tomorrow) and Didn't answer (out for three hours, then first until a chat is logged).
 - Time slider: Any, 15, 30, 60+, as a soft preference that re-weights the ranking by how well each person's expected chat length fits. Expected length = average of recent chats, scaled up by the gap since you last talked (more weight on the gap when history is thin), 30 minutes with no history.
 - Dates strip: the next birthdays and important dates.
 

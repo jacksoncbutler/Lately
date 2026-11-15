@@ -47,6 +47,7 @@ void main() {
   const fixtures = [
     'backup_v1_0_minimal.json',
     'backup_v1_0_full.json',
+    'backup_v1_1_channels.json',
     'backup_v1_7_unknown_fields.json',
   ];
 
@@ -74,6 +75,35 @@ void main() {
     expect((await repo.chatsFor('p-001')).single.length, 'catchup');
     expect((await repo.linesFor('p-001')).single.lineText, 'Ask about the new job');
     expect((await repo.getSettings()).awakeEnd, '22:00');
+  });
+
+  test('a 1.1 file keeps the preferred channel, Instagram, the number and "didn\'t answer"', () async {
+    await svc.importBackup(parseBackup(fixture('backup_v1_1_channels.json')), ImportMode.replace);
+    final ana = (await repo.getPerson('p-ana'))!;
+    expect(ana.contactMethodType, 'whatsapp');
+    expect(ana.phone, '+351912345678');
+    expect(ana.instagram, 'ana.s');
+    expect(ana.unansweredAt!.toUtc(), DateTime.utc(2026, 11, 10, 18, 30));
+    expect(ana.snoozedUntil!.toUtc(), DateTime.utc(2026, 11, 20));
+    final ig = (await repo.getPerson('p-ig'))!;
+    expect((ig.contactMethodType, ig.contactMethodValue, ig.instagram), ('instagram', 'ig.only', 'ig.only'));
+    // And they survive a round trip.
+    final out = jsonDecode(await svc.exportToString()) as Map;
+    expect(out['formatVersion'], '1.1');
+    final people = <String, Map>{
+      for (final p in ((out['data'] as Map)['people'] as List).cast<Map>()) p['id'] as String: p,
+    };
+    final ana2 = people['p-ana']!;
+    expect(ana2['instagram'], 'ana.s');
+    expect(ana2['unansweredAt'], '2026-11-10T18:30:00.000Z');
+    expect((ana2['contactMethod'] as Map)['type'], 'whatsapp');
+  });
+
+  test('older 1.0 files still import, and gain nothing they did not have', () async {
+    await svc.importBackup(parseBackup(fixture('backup_v1_0_full.json')), ImportMode.replace);
+    final ruth = (await repo.getPerson('p-ruth'))!;
+    expect(ruth.instagram, isNull);
+    expect(ruth.unansweredAt, isNull);
   });
 
   test('full file keeps every field, including soft deletes', () async {

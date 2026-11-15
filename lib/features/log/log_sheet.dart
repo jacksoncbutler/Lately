@@ -136,6 +136,16 @@ class _LogSheetState extends ConsumerState<LogSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // Make room for the keyboard so the field you are typing in stays visible,
+    // and hide the Save bar while it is up.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: _content(context, keyboardOpen: keyboard > 0),
+    );
+  }
+
+  Widget _content(BuildContext context, {required bool keyboardOpen}) {
     final t = Theme.of(context).textTheme;
     final person = ref.watch(personProvider(_personId)).value;
     if (person == null) return const Center(child: CircularProgressIndicator());
@@ -294,10 +304,11 @@ class _LogSheetState extends ConsumerState<LogSheet> {
           ],
         ),
       ),
-      const Divider(),
-      SafeArea(
-        top: false,
-        child: Padding(
+      if (!keyboardOpen) const Divider(),
+      if (!keyboardOpen)
+        SafeArea(
+          top: false,
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text(

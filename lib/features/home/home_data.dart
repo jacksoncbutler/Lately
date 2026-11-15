@@ -35,6 +35,7 @@ List<RankPerson> buildRankPeople({
           snoozedUntil: p.snoozedUntil,
           skippedUntil: p.skippedUntil,
           lastTalkedEstimate: p.lastTalkedEstimate,
+          unansweredAt: p.unansweredAt,
           chats: byPerson[p.id] ?? const [],
         ),
   ];

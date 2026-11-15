@@ -192,6 +192,83 @@ void main() {
     });
   });
 
+  group('the keyboard does not cover what you are typing', () {
+    const keyboard = 700.0; // physical pixels (the test screen is 1400 tall, like a phone)
+    const screen = 1400.0;
+
+    Future<void> openPopup(WidgetTester tester) async {
+      await pumpApp(tester);
+      tester.view.physicalSize = const Size(800, screen);
+      await openProfile(tester, 'Sam');
+      await tester.tap(find.byKey(const Key('profile-log')));
+      await settle(tester);
+    }
+
+    /// Scrolls [f] into the middle of the popup (clear of the Save bar).
+    Future<void> bring(WidgetTester tester, Finder f) async {
+      await reveal(tester, f);
+      await Scrollable.ensureVisible(tester.element(f), alignment: 0.3);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> showKeyboard(WidgetTester tester) async {
+      tester.view.viewInsets = const FakeViewPadding(bottom: keyboard);
+      addTearDown(tester.view.resetViewInsets);
+      await settle(tester);
+    }
+
+    testApp('the add-a-line field at the bottom stays above the keyboard', (tester) async {
+      await openPopup(tester);
+      await bring(tester, inSheet(find.byKey(const Key('add-About'))));
+      await tester.tap(inSheet(find.byKey(const Key('add-About'))));
+      await tester.pumpAndSettle();
+      await showKeyboard(tester);
+      final field = tester.getRect(find.byKey(const Key('add-field')));
+      expect(field.bottom, lessThanOrEqualTo(screen - keyboard));
+      expect(field.top, greaterThanOrEqualTo(0));
+    });
+
+    testApp('the note field stays above the keyboard', (tester) async {
+      await openPopup(tester);
+      await bring(tester, find.byKey(const Key('log-note')));
+      await tester.tap(find.byKey(const Key('log-note')));
+      await tester.pumpAndSettle();
+      await showKeyboard(tester);
+      expect(tester.getRect(find.byKey(const Key('log-note'))).bottom, lessThanOrEqualTo(screen - keyboard));
+    });
+
+    testApp('the person search stays above the keyboard', (tester) async {
+      await repo.createPerson(displayName: 'Bo', groupId: groupId, timezone: 'UTC', timezoneConfirmed: true, contactMethodType: 'text');
+      await openPopup(tester);
+      await tester.tap(find.byKey(const Key('log-change')));
+      await settle(tester);
+      await showKeyboard(tester);
+      expect(tester.getRect(find.byKey(const Key('picker-search'))).bottom, lessThanOrEqualTo(screen - keyboard));
+    });
+
+    testApp('Save chat is hidden while the keyboard is up and comes back after', (tester) async {
+      await openPopup(tester);
+      expect(find.byKey(const Key('log-save')), findsOneWidget);
+      await showKeyboard(tester);
+      expect(find.byKey(const Key('log-save')), findsNothing);
+      tester.view.resetViewInsets();
+      await settle(tester);
+      expect(find.byKey(const Key('log-save')), findsOneWidget);
+    });
+
+    testApp('typing a line with the keyboard up still adds it', (tester) async {
+      await openPopup(tester);
+      await bring(tester, inSheet(find.byKey(const Key('add-About'))));
+      await tester.tap(inSheet(find.byKey(const Key('add-About'))));
+      await tester.pumpAndSettle();
+      await showKeyboard(tester);
+      await tester.enterText(find.byKey(const Key('add-field')), 'Moved flats');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await settle(tester);
+      expect((await repo.linesFor(sam, block: 'about')).single.lineText, 'Moved flats');
+    });
+  });
+
   group('when', () {
     testApp('yesterday is the current time minus one day', (tester) async {
       await pumpApp(tester);

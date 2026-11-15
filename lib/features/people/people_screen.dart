@@ -18,7 +18,8 @@ const _statusLabels = {
   PersonStatus.asleep: 'Asleep',
   PersonStatus.today: 'Talked today',
   PersonStatus.notDue: 'Not due',
-  PersonStatus.snoozed: 'Snoozed',
+  PersonStatus.snoozed: 'Paused',
+  PersonStatus.retryLater: 'Try again later',
   PersonStatus.skipped: 'Skipped',
 };
 

@@ -7,28 +7,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lately/data/database.dart';
 import 'package:lately/data/device_sources.dart';
-import 'package:lately/data/phone_launcher.dart';
 import 'package:lately/data/providers.dart';
 import 'package:lately/data/repository.dart';
 import 'package:lately/domain/timezones.dart';
 import 'package:lately/features/log/log_sheet.dart';
 import 'package:lately/main.dart';
 
+import 'support/fakes.dart';
+
 class _Tz implements DeviceTimezone {
   @override
   Future<String> current() async => 'America/Chicago';
 }
 
-class _Launcher implements PhoneLauncher {
-  @override
-  Future<bool> call(String number) async => true;
-  @override
-  Future<bool> message(String number) async => true;
-}
-
 void main() {
   late LatelyDatabase db;
   late Repository repo;
+  late FakeLauncher launcher;
   late String friends, parents;
   // 2026-11-11 14:10 UTC = 08:10 in Chicago (you), 14:10 Lisbon, 15:10 Berlin.
   var clock = DateTime.utc(2026, 11, 11, 14, 10);
@@ -37,6 +32,7 @@ void main() {
 
   setUp(() async {
     clock = DateTime.utc(2026, 11, 11, 14, 10);
+    launcher = FakeLauncher();
     db = LatelyDatabase(NativeDatabase.memory());
     repo = Repository(db, clock: () => clock);
     await repo.completeSetup();
@@ -71,7 +67,7 @@ void main() {
         databaseProvider.overrideWithValue(db),
         snapshotDirProvider.overrideWithValue(Directory.systemTemp),
         deviceTimezoneProvider.overrideWithValue(_Tz()),
-        phoneLauncherProvider.overrideWithValue(_Launcher()),
+        phoneLauncherProvider.overrideWithValue(launcher),
         nowProvider.overrideWithValue(() => clock),
       ],
       child: const LatelyApp(),
@@ -120,10 +116,11 @@ void main() {
       expect(text(tester, 'hero-clock'), '2:10 pm there, likely free');
       expect(text(tester, 'hero-why'), 'Overdue by 3 weeks · probably a 35 minute catch-up');
       expect(find.text('Up next'), findsOneWidget);
-      for (final k in ['hero-contact', 'hero-log', 'hero-skip', 'hero-snooze']) {
+      for (final k in ['hero-contact', 'hero-log', 'hero-skip', 'hero-no-answer']) {
         expect(find.byKey(Key(k)), findsOneWidget, reason: k);
       }
-      expect(find.text('Snooze 7 days'), findsOneWidget);
+      expect(find.text("Didn't answer"), findsOneWidget);
+      expect(find.textContaining('Snooze'), findsNothing);
       expect(find.text('Not today'), findsOneWidget);
     });
 
@@ -187,18 +184,26 @@ void main() {
       expect(find.byKey(const Key('profile-contact')), findsOneWidget);
     });
 
-    testApp('Contact opens the reach sheet and Log opens the popup on the same person', (tester) async {
+    testApp('Contact opens straight to their preferred app and Log opens the popup on the same person', (tester) async {
       await add('Sam', daysAgo: 51);
       await pumpHome(tester);
       await tester.tap(find.byKey(const Key('hero-contact')));
       await settle(tester);
-      expect(find.text('Reach Sam'), findsOneWidget);
-      await tester.tapAt(const Offset(10, 10)); // dismiss
-      await settle(tester);
+      expect(launcher.calls, ['sms:+3515550100']);
+      expect(find.textContaining('Reach'), findsNothing); // no chooser
+      // You tried: the follow-up prompt is there.
+      expect(find.text('Did you get to talk to Sam?'), findsOneWidget);
       await tester.tap(find.byKey(const Key('hero-log')));
       await settle(tester);
       expect(find.byType(LogSheet), findsOneWidget);
       expect(find.descendant(of: find.byType(LogSheet), matching: find.text('Sam')), findsOneWidget);
+    });
+
+    testApp('with nothing to reach them by, Contact is disabled', (tester) async {
+      final id = await repo.createPerson(displayName: 'Nobody', groupId: friends, timezone: 'Europe/Lisbon', timezoneConfirmed: true, contactMethodType: 'text', lastTalkedEstimate: clock.subtract(const Duration(days: 60)));
+      expect(id, isNotEmpty);
+      await pumpHome(tester);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('hero-contact'))).onPressed, isNull);
     });
 
     testApp('the floating log button starts on the person Home is showing', (tester) async {
@@ -247,12 +252,12 @@ void main() {
       expect(text(tester, 'caught-up-body'), 'Alex wakes in about 7 hours.');
     });
 
-    testApp('everyone snoozed or skipped', (tester) async {
+    testApp('everyone paused', (tester) async {
       final a = await add('Sam', daysAgo: 80);
       await repo.snoozeUntil(a, clock.add(const Duration(days: 5)));
       await pumpHome(tester);
       expect(text(tester, 'caught-up-title'), 'Nobody to suggest');
-      expect(text(tester, 'caught-up-body'), 'Everyone is snoozed or skipped for today.');
+      expect(text(tester, 'caught-up-body'), 'Everyone is paused or skipped for today.');
     });
 
     testApp('Browse everyone opens the people list from the card', (tester) async {
@@ -264,7 +269,7 @@ void main() {
     });
   });
 
-  group('Not today and Snooze', () {
+  group('Not today', () {
     testApp('Not today hides them until local midnight, with Undo, and shows the next person', (tester) async {
       final sam = await add('Sam', daysAgo: 60);
       await add('Bo', daysAgo: 40);
@@ -371,30 +376,140 @@ void main() {
       expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
     });
 
-    testApp('Snooze hides for seven days, with Undo, and they return after that', (tester) async {
+  });
+
+  group("Didn't answer", () {
+    testApp('they leave Home for three hours, with Undo, and it is not a chat', (tester) async {
       final sam = await add('Sam', daysAgo: 60);
       await add('Bo', daysAgo: 40);
       await pumpHome(tester);
-      await tester.tap(find.byKey(const Key('hero-snooze')));
+      await tester.tap(find.byKey(const Key('hero-no-answer')));
       await settle(tester);
       expect(heroName('Bo'), findsOneWidget);
-      expect(find.text('Sam snoozed for 7 days'), findsOneWidget);
-      expect((await repo.getPerson(sam))!.snoozedUntil!.toUtc(), clock.add(const Duration(days: 7)));
+      expect(find.text('Noted. Sam will be back in about 3 hours.'), findsOneWidget);
+      final p = (await repo.getPerson(sam))!;
+      expect(p.unansweredAt!.toUtc(), clock);
+      expect(await repo.chatsFor(sam), hasLength(1)); // still just the old chat: nothing logged
+      expect((await repo.lastContactOf(p))!.toUtc(), clock.subtract(const Duration(days: 60)));
+      // Not shown as skipped or paused, and no "Home moved on" message for your own action.
+      expect(find.textContaining('Home moved on'), findsNothing);
 
-      await advance(tester, const Duration(days: 7, hours: 1));
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect((await repo.getPerson(sam))!.unansweredAt, isNull);
       expect(heroName('Sam'), findsOneWidget);
     });
 
-    testApp('Snooze can be undone', (tester) async {
-      final sam = await add('Sam', daysAgo: 60);
+    testApp('they come back after three hours, not before', (tester) async {
+      await add('Sam', daysAgo: 60);
       await add('Bo', daysAgo: 40);
       await pumpHome(tester);
-      await tester.tap(find.byKey(const Key('hero-snooze')));
+      await tester.tap(find.byKey(const Key('hero-no-answer')));
       await settle(tester);
-      await tester.tap(find.text('Undo'));
-      await settle(tester);
-      expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
+      await advance(tester, const Duration(hours: 2, minutes: 58));
+      expect(heroName('Bo'), findsOneWidget);
+      await advance(tester, const Duration(minutes: 3));
       expect(heroName('Sam'), findsOneWidget);
+    });
+
+    testApp('once back, they go to the front even if someone else is more overdue', (tester) async {
+      final sam = await add('Sam', daysAgo: 40); // ratio 1.3
+      await add('Bo', daysAgo: 150); // ratio 5
+      await repo.updatePerson(sam, PeopleCompanion(unansweredAt: Value(clock.subtract(const Duration(hours: 4)))));
+      await pumpHome(tester);
+      expect(heroName('Sam'), findsOneWidget);
+      expect(text(tester, 'hero-why').startsWith('You tried earlier · Overdue by'), isTrue);
+    });
+
+    testApp('someone who was not due yet is still brought back after you tried', (tester) async {
+      final sam = await add('Sam', daysAgo: 5); // ratio .17: normally not due
+      await add('Bo', daysAgo: 40);
+      await repo.updatePerson(sam, PeopleCompanion(unansweredAt: Value(clock.subtract(const Duration(hours: 4)))));
+      await pumpHome(tester);
+      expect(heroName('Sam'), findsOneWidget);
+      expect(text(tester, 'hero-why').startsWith('You tried earlier'), isTrue);
+    });
+
+    testApp('the time preference does not push them down', (tester) async {
+      final sam = await add('Sam', daysAgo: 40, minutes: 90, length: 'long');
+      await add('Short', daysAgo: 45, minutes: 10, length: 'quick');
+      await repo.updatePerson(sam, PeopleCompanion(unansweredAt: Value(clock.subtract(const Duration(hours: 4)))));
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('chip-15')));
+      await settle(tester);
+      expect(heroName('Sam'), findsOneWidget);
+    });
+
+    testApp('the boost fades after a week', (tester) async {
+      final sam = await add('Sam', daysAgo: 40);
+      await add('Bo', daysAgo: 150);
+      await repo.updatePerson(sam, PeopleCompanion(unansweredAt: Value(clock.subtract(const Duration(days: 8)))));
+      await pumpHome(tester);
+      expect(heroName('Bo'), findsOneWidget); // back to normal order
+    });
+
+    testApp('logging a chat clears it', (tester) async {
+      final sam = await add('Sam', daysAgo: 40);
+      await repo.updatePerson(sam, PeopleCompanion(unansweredAt: Value(clock.subtract(const Duration(hours: 4)))));
+      await repo.logChat(personId: sam, occurredAt: clock, type: 'call', depth: 'varied', durationMinutes: 20);
+      expect((await repo.getPerson(sam))!.unansweredAt, isNull);
+    });
+
+    testApp('a person who is asleep stays out, even boosted', (tester) async {
+      final jun = await add('Jun', zone: 'Asia/Tokyo', daysAgo: 60); // 23:10 there
+      await repo.updatePerson(jun, PeopleCompanion(unansweredAt: Value(clock.subtract(const Duration(hours: 4)))));
+      await pumpHome(tester);
+      expect(find.byKey(const Key('hero-card')), findsNothing);
+      expect(text(tester, 'caught-up-title'), 'Nobody is free right now');
+    });
+
+    testApp('the card says when they will be back', (tester) async {
+      await add('Sam', daysAgo: 60);
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('hero-no-answer')));
+      await settle(tester);
+      expect(find.byKey(const Key('hero-card')), findsNothing);
+      expect(text(tester, 'caught-up-title'), 'Nobody is free right now');
+      expect(text(tester, 'caught-up-body'), 'Sam is back in about 3 hours.');
+    });
+
+    testApp('trying again later restarts the three hours', (tester) async {
+      final sam = await add('Sam', daysAgo: 60);
+      await add('Bo', daysAgo: 40);
+      await repo.updatePerson(sam, PeopleCompanion(unansweredAt: Value(clock.subtract(const Duration(hours: 5)))));
+      await pumpHome(tester);
+      expect(heroName('Sam'), findsOneWidget); // back, and boosted
+      await tester.tap(find.byKey(const Key('hero-no-answer')));
+      await settle(tester);
+      expect(heroName('Bo'), findsOneWidget);
+      expect((await repo.getPerson(sam))!.unansweredAt!.toUtc(), clock);
+    });
+
+    testApp('the People tab says Try again later while they are out', (tester) async {
+      await add('Sam', daysAgo: 60);
+      await add('Bo', daysAgo: 40);
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('hero-no-answer')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('tab-people')));
+      await settle(tester);
+      expect(find.text('Try again later'), findsOneWidget);
+    });
+
+    testApp('right after Contact, the prompt offers Didn\'t answer', (tester) async {
+      final sam = await add('Sam', daysAgo: 60);
+      await add('Bo', daysAgo: 40);
+      await repo.setRecentContact(sam);
+      await pumpHome(tester);
+      expect(find.text('Did you get to talk to Sam?'), findsOneWidget);
+      expect(find.text('Log it'), findsOneWidget);
+      expect(find.text('Not yet'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('prompt-no-answer')));
+      await settle(tester);
+      expect(find.text('Did you get to talk to Sam?'), findsNothing);
+      expect((await repo.getSettings()).recentContactPersonId, isNull);
+      expect((await repo.getPerson(sam))!.unansweredAt, isNotNull);
+      expect(heroName('Bo'), findsOneWidget);
     });
   });
 

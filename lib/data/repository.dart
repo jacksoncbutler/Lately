@@ -97,6 +97,7 @@ class Repository {
     DateTime? lastTalkedEstimate,
     bool timezoneConfirmed = false,
     String? phone,
+    String? instagram,
   }) async {
     final id = newId();
     final t = _now;
@@ -110,6 +111,7 @@ class Repository {
         contactMethodType: contactMethodType,
         contactMethodValue: Value(contactMethodValue),
         phone: Value(phone),
+        instagram: Value(instagram),
         lastTalkedEstimate: Value(lastTalkedEstimate?.toUtc()),
         timezoneConfirmed: Value(timezoneConfirmed)));
     return id;
@@ -457,7 +459,10 @@ class Repository {
       }
       await updatePerson(
           personId,
-          const PeopleCompanion(snoozedUntil: Value(null), skippedUntil: Value(null)));
+          const PeopleCompanion(
+              snoozedUntil: Value(null),
+              skippedUntil: Value(null),
+              unansweredAt: Value(null)));
       final s = await getSettings();
       if (s.recentContactPersonId == personId) {
         await updateSettings(const SettingsCompanion(
@@ -546,6 +551,21 @@ class Repository {
 
   Future<void> snoozeUntil(String personId, DateTime until) =>
       updatePerson(personId, PeopleCompanion(snoozedUntil: Value(until.toUtc())));
+
+  /// "Didn't answer": they leave Home for a few hours and are boosted after,
+  /// until a chat is logged. It is not contact, so the clock does not reset.
+  /// The "Did you get to talk to them?" prompt for them is cleared.
+  Future<void> didntAnswer(String personId) async {
+    await updatePerson(personId, PeopleCompanion(unansweredAt: Value(_now)));
+    final s = await getSettings();
+    if (s.recentContactPersonId == personId) {
+      await updateSettings(const SettingsCompanion(
+          recentContactPersonId: Value(null), recentContactAt: Value(null)));
+    }
+  }
+
+  Future<void> restoreUnanswered(String personId, DateTime? previous) =>
+      updatePerson(personId, PeopleCompanion(unansweredAt: Value(previous?.toUtc())));
 
   Future<void> clearSnooze(String personId) =>
       updatePerson(personId, const PeopleCompanion(snoozedUntil: Value(null)));

@@ -29,7 +29,7 @@ class LatelyDatabase extends _$LatelyDatabase {
 
   /// Bump with every table change and add a step in [onUpgrade]. The database
   /// file is copied aside before migrating (see lib/data/safe_open.dart).
-  static const currentSchemaVersion = 3;
+  static const currentSchemaVersion = 4;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -55,6 +55,12 @@ class LatelyDatabase extends _$LatelyDatabase {
                 'WHERE EXISTS (SELECT 1 FROM people)');
             await (update(settings)..where((t) => t.id.equals(settingsId)))
                 .write(const SettingsCompanion(schemaVersion: Value(3)));
+          }
+          if (from < 4) {
+            await m.addColumn(people, people.instagram);
+            await m.addColumn(people, people.unansweredAt);
+            await (update(settings)..where((t) => t.id.equals(settingsId)))
+                .write(const SettingsCompanion(schemaVersion: Value(4)));
           }
         },
         beforeOpen: (details) async {

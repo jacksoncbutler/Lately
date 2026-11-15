@@ -5,12 +5,12 @@ class AppConfig {
   static const appName = 'Lately';
 
   /// Keep equal to the version in pubspec.yaml (a test checks this).
-  static const appVersion = '0.8.0';
+  static const appVersion = '0.9.0';
   static const backupFormat = 'lately-backup';
 
   /// Backup file format. Major changes need a migration; minor only add
   /// optional fields. See "Backup format" in docs/technical-plan.md.
   static const backupMajor = 1;
-  static const backupMinor = 0;
+  static const backupMinor = 1;
   static const backupFormatVersion = '$backupMajor.$backupMinor';
 }

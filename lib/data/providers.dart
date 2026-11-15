@@ -21,8 +21,12 @@ final snapshotDirProvider = Provider<Directory>(
 final backupPlatformProvider =
     Provider<BackupPlatform>((ref) => DeviceBackupPlatform());
 
-final repositoryProvider =
-    Provider<Repository>((ref) => Repository(ref.watch(databaseProvider)));
+/// The app's clock; tests override it for stable times. Declared first because
+/// the repository stamps its writes with it too.
+final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+final repositoryProvider = Provider<Repository>(
+    (ref) => Repository(ref.watch(databaseProvider), clock: ref.watch(nowProvider)));
 
 final backupServiceProvider = Provider<BackupService>((ref) => BackupService(
     ref.watch(databaseProvider),
@@ -37,9 +41,6 @@ final contactsSourceProvider =
 
 final deviceTimezoneProvider =
     Provider<DeviceTimezone>((ref) => FlutterDeviceTimezone());
-
-/// The current time; tests override it for stable clocks.
-final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
 final setupCompleteProvider = FutureProvider<bool>(
     (ref) => ref.watch(repositoryProvider).isSetupComplete());

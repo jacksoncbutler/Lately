@@ -33,7 +33,7 @@ Eight entities cover version 1, and every piece of profile information is a shor
 | --- | --- | --- | --- |
 | Settings (one record) | awake window start and end, block order, schema version | skip policy, theme, recent contact (person and time) | Global defaults for the app |
 | Group | name, default interval in days | sort order, color | Seeded with parents, siblings, friends; users can add more |
-| Person | display name, group, timezone (IANA name), preferred contact method | full name, middle name, birthday, interval override, phone, socials, hometown, last-talked estimate, timezone confirmed, snoozed until, archived | Last contact is computed from chats; the estimate only seeds a new person |
+| Person | display name, group, timezone (IANA name), preferred contact method (text, call, whatsapp or instagram) | full name, middle name, birthday, interval override, phone (international form), instagram username, socials, hometown, last-talked estimate, timezone confirmed, snoozed until (shown as Paused), skipped until, unanswered at ("Didn't answer"), archived | Last contact is computed from chats; the estimate only seeds a new person |
 | Relationship (Their people) | person, name | relation (free text), birthday, added-in chat | Tiles on the profile. Each has its own notes as Lines linked to the relationship. No interval, never ranked; birthdays feed Dates |
 | Line | person, block key, text | done flag, done time, chat link, relationship link (a note on someone in Their people), added-in chat (set when added from the log popup), sort order | One short entry in Next time, Interests, About, or a custom block |
 | Chat | person, date and time, type, depth, duration in minutes (1 to 60, where 60 means 60 or more), length (derived: up to 20 quick, up to 45 catch-up, longer long) | feelings (list), note (what the chat was about), source (manual now; call log later), call id (later, prevents duplicates) | The time is when the chat happened (the When field, default now), not when it was saved. For another day only the date is asked: store 12:00 local time and mark the time as approximate, so later availability learning ignores it. Saving resets that person's clock |
@@ -61,7 +61,7 @@ These were settled while testing the prototype. Keep them identical on every scr
 - **Log popup:** type and depth are the only required taps. How long is a slider from 1 to 60+ minutes, preset to 30. When is just now, yesterday (current time minus one day) or another day (date only, never in the future, stored as 12:00 local and marked approximate). The what-was-it-about note sits below feelings and the covered Next time items, above Their profile. The bottom of the popup holds the person's real profile blocks with full add, edit and delete, saved immediately. Lines and relationships added there are collected and stamped with the new chat's id when the chat is saved.
 - **Chat detail:** tapping a chat in Recent chats shows type, length, depth, duration, feelings and note, then what was new from it: lines with that chat as covered-in (Next time items ticked off), lines and relationships with it as added-in. Old chats with nothing linked say nothing was recorded.
 - **Edit person:** the Edit button opens one sheet with every detail. Archive is a button at its bottom. An archived person shows in a collapsed Archived list at the bottom of People, with a banner and Restore on their profile. Delete forever is offered only when archived, needs a confirmation, and removes their lines, relationships and chats.
-- **Home:** Contact and Log stack full width, with Not today and Snooze as small text links under them. Contact opens a call or message chooser. After Contact and a return to the app, Home asks whether you talked, with Log it and Not yet; the log popup then defaults to that person for three hours.
+- **Home:** Contact and Log stack full width, with Not today and Snooze as small text links under them. Contact opens straight to the person's preferred app (text, call, WhatsApp or Instagram DM); a person's number and Instagram are tappable on their profile for the other options. After Contact and a return to the app, Home asks whether you talked, with Log it and Not yet; the log popup then defaults to that person for three hours.
 - **Reference files:** reference/logic.js holds the ranking, expected length, chip scoring and why-line rules as plain functions, with reference/test.js. Port them first and keep the tests. reference/prototype/lately-prototype.html is the clickable prototype that shows every screen.
 
 ## Backup format
@@ -192,7 +192,8 @@ When a person has no chats, 30 minutes is counted. The last-talked answer at onb
 **Skip and snooze**
 
 - Skip hides that person until midnight local time, then they return at the same rank. They come back sooner only when they are the one skipped person left and everyone else eligible has been talked to today. Skip everyone and Home says That's everyone for today. If a person who came back early is skipped again, they are held until tomorrow like a snooze, so the card always changes.
-- Snooze hides them for 7 days by default, and the user can pick another date.
+- Didn't answer: they leave Home for 3 hours, then go to the front of the queue (ignoring the due floor and the time preference, but still needing to be awake) until a chat is logged, fading after 7 days. It is not contact and shows no counts. It appears on the card and in the "Did you get to talk to them?" prompt.
+- Pause (formerly Snooze): on the profile under Manage, Pause suggestions until a chosen date. Not on Home.
 
 **Why line**
 
@@ -264,3 +265,9 @@ Working rules for the builder:
 ## Repository layout and conventions
 
 The Flutter project lives at the repository root, next to `docs/` and `reference/`: `lib/`, `test/`, `pubspec.yaml`, `android/`. `docs/ARCHITECTURE.md` maps folders to this plan. App name, icon and package id (`net.butler.lately`) are kept in one place because they are temporary. Platform-specific code (contacts, file picking, share sheet) sits behind small interfaces so iPhone support can be added later.
+
+## Reaching people (version 0.9)
+
+- Numbers are saved in international form (+351912345678). The number box has a country-code button (searchable by name, dial code or ISO code): it starts at the US, follows the person's country once their city is chosen, and a typed + or 00 number sets it. A leading 0 means the person's own country and is dropped. Parsing is offline (phone_numbers_parser); country names and timezone-to-country come from the tz database (`tool/make_countries.dart`).
+- WhatsApp opens with `whatsapp://send?phone=` (the app's own link, so it fails instead of opening a web page). Instagram DM uses `https://ig.me/m/<username>`; Instagram profile uses `instagram://user?username=`. No INTERNET permission is needed; these are launched by other apps only on a tap. **To check on the phone:** the Instagram DM and profile links, and WhatsApp.
+- Backup format 1.1 adds optional `instagram` and `unansweredAt` on people and the contact method types `whatsapp` and `instagram`. 1.0 files import unchanged.

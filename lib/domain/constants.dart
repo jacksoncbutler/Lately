@@ -14,7 +14,10 @@ class Tune {
   static const lastN = 5;
   static const awakeStartHour = 8;
   static const awakeEndHour = 22;
-  static const snoozeDays = 7;
+  /// After "Didn't answer": out of Home this long, then boosted until a chat
+  /// is logged, fading after [unansweredBoostDays].
+  static const unansweredCooldownHours = 3;
+  static const unansweredBoostDays = 7;
 
   /// Group priority weights are all 1.0 in version 1; tune after real use.
   static const defaultGroupWeight = 1.0;

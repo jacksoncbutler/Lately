@@ -1716,6 +1716,28 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _instagramMeta = const VerificationMeta(
+    'instagram',
+  );
+  @override
+  late final GeneratedColumn<String> instagram = GeneratedColumn<String>(
+    'instagram',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unansweredAtMeta = const VerificationMeta(
+    'unansweredAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> unansweredAt = GeneratedColumn<DateTime>(
+    'unanswered_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1740,6 +1762,8 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
     snoozedUntil,
     skippedUntil,
     archivedAt,
+    instagram,
+    unansweredAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1920,6 +1944,21 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
         archivedAt.isAcceptableOrUnknown(data['archived_at']!, _archivedAtMeta),
       );
     }
+    if (data.containsKey('instagram')) {
+      context.handle(
+        _instagramMeta,
+        instagram.isAcceptableOrUnknown(data['instagram']!, _instagramMeta),
+      );
+    }
+    if (data.containsKey('unanswered_at')) {
+      context.handle(
+        _unansweredAtMeta,
+        unansweredAt.isAcceptableOrUnknown(
+          data['unanswered_at']!,
+          _unansweredAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2017,6 +2056,14 @@ class $PeopleTable extends People with TableInfo<$PeopleTable, PersonRow> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}archived_at'],
       ),
+      instagram: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}instagram'],
+      ),
+      unansweredAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}unanswered_at'],
+      ),
     );
   }
 
@@ -2061,6 +2108,13 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
   /// Skip hides a person until this instant (next local midnight).
   final DateTime? skippedUntil;
   final DateTime? archivedAt;
+
+  /// Instagram username without the @ (for opening their DM or profile).
+  final String? instagram;
+
+  /// When you last tried to reach them and they did not answer. Keeps them
+  /// out of Home for a few hours, then boosts them until a chat is logged.
+  final DateTime? unansweredAt;
   const PersonRow({
     required this.id,
     required this.createdAt,
@@ -2084,6 +2138,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     this.snoozedUntil,
     this.skippedUntil,
     this.archivedAt,
+    this.instagram,
+    this.unansweredAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2137,6 +2193,12 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     }
     if (!nullToAbsent || archivedAt != null) {
       map['archived_at'] = Variable<DateTime>(archivedAt);
+    }
+    if (!nullToAbsent || instagram != null) {
+      map['instagram'] = Variable<String>(instagram);
+    }
+    if (!nullToAbsent || unansweredAt != null) {
+      map['unanswered_at'] = Variable<DateTime>(unansweredAt);
     }
     return map;
   }
@@ -2193,6 +2255,12 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       archivedAt: archivedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(archivedAt),
+      instagram: instagram == null && nullToAbsent
+          ? const Value.absent()
+          : Value(instagram),
+      unansweredAt: unansweredAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unansweredAt),
     );
   }
 
@@ -2230,6 +2298,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       snoozedUntil: serializer.fromJson<DateTime?>(json['snoozedUntil']),
       skippedUntil: serializer.fromJson<DateTime?>(json['skippedUntil']),
       archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
+      instagram: serializer.fromJson<String?>(json['instagram']),
+      unansweredAt: serializer.fromJson<DateTime?>(json['unansweredAt']),
     );
   }
   @override
@@ -2258,6 +2328,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       'snoozedUntil': serializer.toJson<DateTime?>(snoozedUntil),
       'skippedUntil': serializer.toJson<DateTime?>(skippedUntil),
       'archivedAt': serializer.toJson<DateTime?>(archivedAt),
+      'instagram': serializer.toJson<String?>(instagram),
+      'unansweredAt': serializer.toJson<DateTime?>(unansweredAt),
     };
   }
 
@@ -2284,6 +2356,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     Value<DateTime?> snoozedUntil = const Value.absent(),
     Value<DateTime?> skippedUntil = const Value.absent(),
     Value<DateTime?> archivedAt = const Value.absent(),
+    Value<String?> instagram = const Value.absent(),
+    Value<DateTime?> unansweredAt = const Value.absent(),
   }) => PersonRow(
     id: id ?? this.id,
     createdAt: createdAt ?? this.createdAt,
@@ -2313,6 +2387,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     snoozedUntil: snoozedUntil.present ? snoozedUntil.value : this.snoozedUntil,
     skippedUntil: skippedUntil.present ? skippedUntil.value : this.skippedUntil,
     archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
+    instagram: instagram.present ? instagram.value : this.instagram,
+    unansweredAt: unansweredAt.present ? unansweredAt.value : this.unansweredAt,
   );
   PersonRow copyWithCompanion(PeopleCompanion data) {
     return PersonRow(
@@ -2358,6 +2434,10 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
       archivedAt: data.archivedAt.present
           ? data.archivedAt.value
           : this.archivedAt,
+      instagram: data.instagram.present ? data.instagram.value : this.instagram,
+      unansweredAt: data.unansweredAt.present
+          ? data.unansweredAt.value
+          : this.unansweredAt,
     );
   }
 
@@ -2385,7 +2465,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
           ..write('lastTalkedEstimate: $lastTalkedEstimate, ')
           ..write('snoozedUntil: $snoozedUntil, ')
           ..write('skippedUntil: $skippedUntil, ')
-          ..write('archivedAt: $archivedAt')
+          ..write('archivedAt: $archivedAt, ')
+          ..write('instagram: $instagram, ')
+          ..write('unansweredAt: $unansweredAt')
           ..write(')'))
         .toString();
   }
@@ -2414,6 +2496,8 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
     snoozedUntil,
     skippedUntil,
     archivedAt,
+    instagram,
+    unansweredAt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2440,7 +2524,9 @@ class PersonRow extends DataClass implements Insertable<PersonRow> {
           other.lastTalkedEstimate == this.lastTalkedEstimate &&
           other.snoozedUntil == this.snoozedUntil &&
           other.skippedUntil == this.skippedUntil &&
-          other.archivedAt == this.archivedAt);
+          other.archivedAt == this.archivedAt &&
+          other.instagram == this.instagram &&
+          other.unansweredAt == this.unansweredAt);
 }
 
 class PeopleCompanion extends UpdateCompanion<PersonRow> {
@@ -2466,6 +2552,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
   final Value<DateTime?> snoozedUntil;
   final Value<DateTime?> skippedUntil;
   final Value<DateTime?> archivedAt;
+  final Value<String?> instagram;
+  final Value<DateTime?> unansweredAt;
   final Value<int> rowid;
   const PeopleCompanion({
     this.id = const Value.absent(),
@@ -2490,6 +2578,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     this.snoozedUntil = const Value.absent(),
     this.skippedUntil = const Value.absent(),
     this.archivedAt = const Value.absent(),
+    this.instagram = const Value.absent(),
+    this.unansweredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PeopleCompanion.insert({
@@ -2515,6 +2605,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     this.snoozedUntil = const Value.absent(),
     this.skippedUntil = const Value.absent(),
     this.archivedAt = const Value.absent(),
+    this.instagram = const Value.absent(),
+    this.unansweredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        createdAt = Value(createdAt),
@@ -2546,6 +2638,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     Expression<DateTime>? snoozedUntil,
     Expression<DateTime>? skippedUntil,
     Expression<DateTime>? archivedAt,
+    Expression<String>? instagram,
+    Expression<DateTime>? unansweredAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2574,6 +2668,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
       if (snoozedUntil != null) 'snoozed_until': snoozedUntil,
       if (skippedUntil != null) 'skipped_until': skippedUntil,
       if (archivedAt != null) 'archived_at': archivedAt,
+      if (instagram != null) 'instagram': instagram,
+      if (unansweredAt != null) 'unanswered_at': unansweredAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2601,6 +2697,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     Value<DateTime?>? snoozedUntil,
     Value<DateTime?>? skippedUntil,
     Value<DateTime?>? archivedAt,
+    Value<String?>? instagram,
+    Value<DateTime?>? unansweredAt,
     Value<int>? rowid,
   }) {
     return PeopleCompanion(
@@ -2626,6 +2724,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
       snoozedUntil: snoozedUntil ?? this.snoozedUntil,
       skippedUntil: skippedUntil ?? this.skippedUntil,
       archivedAt: archivedAt ?? this.archivedAt,
+      instagram: instagram ?? this.instagram,
+      unansweredAt: unansweredAt ?? this.unansweredAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2701,6 +2801,12 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
     if (archivedAt.present) {
       map['archived_at'] = Variable<DateTime>(archivedAt.value);
     }
+    if (instagram.present) {
+      map['instagram'] = Variable<String>(instagram.value);
+    }
+    if (unansweredAt.present) {
+      map['unanswered_at'] = Variable<DateTime>(unansweredAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2732,6 +2838,8 @@ class PeopleCompanion extends UpdateCompanion<PersonRow> {
           ..write('snoozedUntil: $snoozedUntil, ')
           ..write('skippedUntil: $skippedUntil, ')
           ..write('archivedAt: $archivedAt, ')
+          ..write('instagram: $instagram, ')
+          ..write('unansweredAt: $unansweredAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6999,6 +7107,8 @@ typedef $$PeopleTableCreateCompanionBuilder = PeopleCompanion Function({
   Value<DateTime?> snoozedUntil,
   Value<DateTime?> skippedUntil,
   Value<DateTime?> archivedAt,
+  Value<String?> instagram,
+  Value<DateTime?> unansweredAt,
   Value<int> rowid,
 });
 typedef $$PeopleTableUpdateCompanionBuilder = PeopleCompanion Function({
@@ -7024,6 +7134,8 @@ typedef $$PeopleTableUpdateCompanionBuilder = PeopleCompanion Function({
   Value<DateTime?> snoozedUntil,
   Value<DateTime?> skippedUntil,
   Value<DateTime?> archivedAt,
+  Value<String?> instagram,
+  Value<DateTime?> unansweredAt,
   Value<int> rowid,
 });
 
@@ -7235,6 +7347,16 @@ class $$PeopleTableFilterComposer
 
   ColumnFilters<DateTime> get archivedAt => $composableBuilder(
     column: $table.archivedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get instagram => $composableBuilder(
+    column: $table.instagram,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get unansweredAt => $composableBuilder(
+    column: $table.unansweredAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7476,6 +7598,16 @@ class $$PeopleTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get instagram => $composableBuilder(
+    column: $table.instagram,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get unansweredAt => $composableBuilder(
+    column: $table.unansweredAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$GroupsTableOrderingComposer get groupId {
     final $$GroupsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -7589,6 +7721,14 @@ class $$PeopleTableAnnotationComposer
 
   GeneratedColumn<DateTime> get archivedAt => $composableBuilder(
     column: $table.archivedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get instagram =>
+      $composableBuilder(column: $table.instagram, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get unansweredAt => $composableBuilder(
+    column: $table.unansweredAt,
     builder: (column) => column,
   );
 
@@ -7772,6 +7912,8 @@ class $$PeopleTableTableManager
                 Value<DateTime?> snoozedUntil = const Value.absent(),
                 Value<DateTime?> skippedUntil = const Value.absent(),
                 Value<DateTime?> archivedAt = const Value.absent(),
+                Value<String?> instagram = const Value.absent(),
+                Value<DateTime?> unansweredAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleCompanion(
                 id: id,
@@ -7796,6 +7938,8 @@ class $$PeopleTableTableManager
                 snoozedUntil: snoozedUntil,
                 skippedUntil: skippedUntil,
                 archivedAt: archivedAt,
+                instagram: instagram,
+                unansweredAt: unansweredAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7822,6 +7966,8 @@ class $$PeopleTableTableManager
                 Value<DateTime?> snoozedUntil = const Value.absent(),
                 Value<DateTime?> skippedUntil = const Value.absent(),
                 Value<DateTime?> archivedAt = const Value.absent(),
+                Value<String?> instagram = const Value.absent(),
+                Value<DateTime?> unansweredAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleCompanion.insert(
                 id: id,
@@ -7846,6 +7992,8 @@ class $$PeopleTableTableManager
                 snoozedUntil: snoozedUntil,
                 skippedUntil: skippedUntil,
                 archivedAt: archivedAt,
+                instagram: instagram,
+                unansweredAt: unansweredAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

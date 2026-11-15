@@ -18,7 +18,7 @@ import '../log/log_sheet.dart';
 import '../people/add_person_screen.dart';
 import '../people/bulk_add_screen.dart';
 import '../profile/profile_screen.dart';
-import '../profile/reach_sheet.dart';
+import '../profile/contact_action.dart';
 import '../settings/settings_screen.dart';
 import 'home_data.dart';
 
@@ -162,17 +162,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             .firstOrNull,
                         now: now,
                         onOpen: () => _openProfile(hero.row!.person.id),
+                        canContact: Reach(people.firstWhere((p) => p.id == hero.row!.person.id)).canContact,
                         onContact: () {
                           _acted = true;
                           final p = people.firstWhere((p) => p.id == hero.row!.person.id);
-                          showReachSheet(context, p);
+                          contactPerson(context, ref, p);
                         },
                         onLog: () {
                           _acted = true;
                           showLogSheet(context, personId: hero.row!.person.id);
                         },
                         onSkip: () => _skip(hero.row!.person, zone, now, alreadySkipped: hero.fromSkipped),
-                        onSnooze: () => _snooze(hero.row!.person, now),
+                        onNoAnswer: () => _noAnswer(hero.row!.person),
                       )
                     else
                       _CaughtUpCard(
@@ -286,12 +287,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     }
   }
 
-  Future<void> _snooze(RankPerson p, DateTime now) async {
+  Future<void> _noAnswer(RankPerson p) async {
     _acted = true;
-    await repo.snoozeUntil(p.id, now.add(const Duration(days: Tune.snoozeDays)));
+    final previous = p.unansweredAt;
+    await repo.didntAnswer(p.id);
     if (mounted) {
-      showUndoBar(context, '${p.name} snoozed for ${Tune.snoozeDays} days',
-          () => repo.clearSnooze(p.id));
+      showUndoBar(
+          context,
+          "Noted. ${p.name} will be back in about ${Tune.unansweredCooldownHours} hours.",
+          () => repo.restoreUnanswered(p.id, previous));
     }
   }
 
@@ -312,6 +316,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     showLogSheet(context, personId: reached.id);
                   },
                   child: const Text('Log it'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  key: const Key('prompt-no-answer'),
+                  onPressed: () => _noAnswer(RankPerson(
+                      id: reached.id,
+                      name: reached.displayName,
+                      zone: reached.timezone,
+                      intervalDays: 1,
+                      unansweredAt: reached.unansweredAt)),
+                  child: const FittedBox(child: Text("Didn't answer")),
                 ),
               ),
               const SizedBox(width: 8),
@@ -366,12 +383,14 @@ class _HeroCard extends ConsumerWidget {
     required this.onContact,
     required this.onLog,
     required this.onSkip,
-    required this.onSnooze,
+    required this.onNoAnswer,
+    required this.canContact,
   });
   final RankRow row;
   final GroupRow? group;
   final DateTime now;
-  final VoidCallback onOpen, onContact, onLog, onSkip, onSnooze;
+  final VoidCallback onOpen, onContact, onLog, onSkip, onNoAnswer;
+  final bool canContact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -447,7 +466,7 @@ class _HeroCard extends ConsumerWidget {
           if (lines.length > 3)
             Text('+ ${lines.length - 3} more on their profile', style: t.bodySmall),
           const SizedBox(height: 14),
-          FilledButton(key: const Key('hero-contact'), onPressed: onContact, child: const Text('Contact')),
+          FilledButton(key: const Key('hero-contact'), onPressed: canContact ? onContact : null, child: const Text('Contact')),
           const SizedBox(height: 8),
           OutlinedButton(key: const Key('hero-log'), onPressed: onLog, child: const Text('Log')),
           const SizedBox(height: 6),
@@ -455,10 +474,10 @@ class _HeroCard extends ConsumerWidget {
             TextButton(key: const Key('hero-skip'), style: muted, onPressed: onSkip, child: const Text('Not today')),
             Text('·', style: TextStyle(color: c.muted)),
             TextButton(
-                key: const Key('hero-snooze'),
+                key: const Key('hero-no-answer'),
                 style: muted,
-                onPressed: onSnooze,
-                child: Text('Snooze ${Tune.snoozeDays} days')),
+                onPressed: onNoAnswer,
+                child: const Text("Didn't answer")),
           ]),
         ]),
       ),
@@ -481,27 +500,34 @@ class _CaughtUpCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final asleep = rows.where((r) => r.status == PersonStatus.asleep).toList()
-      ..sort((a, b) => wakeInMinutes(a.person, now, settings)
-          .compareTo(wakeInMinutes(b.person, now, settings)));
+    // Who is free soonest: someone waking up, or someone you tried who may
+    // pick up later.
+    final waiting = <({String name, int minutes, bool tried})>[
+      for (final r in rows)
+        if (r.status == PersonStatus.asleep)
+          (name: r.person.name, minutes: wakeInMinutes(r.person, now, settings), tried: false),
+      for (final r in rows)
+        if (r.status == PersonStatus.retryLater && r.returnsAt != null)
+          (name: r.person.name, minutes: r.returnsAt!.difference(now).inMinutes.clamp(1, 100000), tried: true),
+    ]..sort((a, b) => a.minutes.compareTo(b.minutes));
     final skipped = rows.any((r) => r.status == PersonStatus.skipped);
     final calm = rows.any((r) => r.status == PersonStatus.notDue || r.status == PersonStatus.today);
 
     final String title;
     final String body;
-    if (asleep.isNotEmpty) {
+    if (waiting.isNotEmpty) {
+      final w = waiting.first;
       title = 'Nobody is free right now';
-      body =
-          '${asleep.first.person.name} wakes in ${aboutDuration(wakeInMinutes(asleep.first.person, now, settings))}.';
+      body = '${w.name} ${w.tried ? 'is back in' : 'wakes in'} ${aboutDuration(w.minutes)}.';
     } else if (skipped) {
       title = "That's everyone for today";
-      body = 'Everyone left is skipped or snoozed. Skipped people come back tomorrow.';
+      body = 'Everyone left is skipped or paused. Skipped people come back tomorrow.';
     } else if (calm) {
       title = "You're caught up";
       body = 'Nobody is due right now. Enjoy the quiet, or browse everyone.';
     } else {
       title = 'Nobody to suggest';
-      body = 'Everyone is snoozed or skipped for today.';
+      body = 'Everyone is paused or skipped for today.';
     }
     return Card(
       key: const Key('caught-up-card'),

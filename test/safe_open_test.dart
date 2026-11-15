@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:drift/drift.dart' show QueryExecutor;
+import 'package:drift/drift.dart' show QueryExecutor, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lately/data/database.dart';
@@ -27,7 +27,11 @@ void main() {
     final g = (await repo.listGroups()).first.id;
     await repo.createPerson(
         displayName: 'Sam', groupId: g, timezone: 'UTC', contactMethodType: 'text');
-    await db.customStatement('ALTER TABLE settings DROP COLUMN setup_completed_at');
+    await db.customStatement('ALTER TABLE people DROP COLUMN instagram');
+    await db.customStatement('ALTER TABLE people DROP COLUMN unanswered_at');
+    if (version < 3) {
+      await db.customStatement('ALTER TABLE settings DROP COLUMN setup_completed_at');
+    }
     if (version < 2) {
       await db.customStatement('ALTER TABLE settings DROP COLUMN last_export_at');
     }
@@ -50,7 +54,7 @@ void main() {
     final repo = Repository(db);
     expect((await repo.listPeople()).single.displayName, 'Sam');
     expect((await repo.getSettings()).lastExportAt, isNull); // column exists again
-    final copies = snaps.listSync().map((e) => e.path).where((p) => p.contains('pre-migration-v1-to-v3'));
+    final copies = snaps.listSync().map((e) => e.path).where((p) => p.contains('pre-migration-v1-to-v4'));
     expect(copies, hasLength(1));
     expect(await repo.isSetupComplete(), isTrue); // Sam exists
     await db.close();
@@ -62,18 +66,34 @@ void main() {
     final repo = Repository(db);
     expect((await repo.listPeople()).single.displayName, 'Sam');
     expect(await repo.isSetupComplete(), isTrue);
-    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v2-to-v3')), hasLength(1));
+    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v2-to-v4')), hasLength(1));
     await db.close();
   });
 
   test('upgrade from 0.2.0 with no people leaves setup to do', () async {
     final db0 = LatelyDatabase(NativeDatabase(dbFile));
+    await db0.customStatement('ALTER TABLE people DROP COLUMN instagram');
+    await db0.customStatement('ALTER TABLE people DROP COLUMN unanswered_at');
     await db0.customStatement('ALTER TABLE settings DROP COLUMN setup_completed_at');
     await db0.customStatement('ALTER TABLE settings DROP COLUMN last_export_at');
     await db0.customStatement('PRAGMA user_version = 1');
     await db0.close();
     final db = await openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain());
     expect(await Repository(db).isSetupComplete(), isFalse);
+    await db.close();
+  });
+
+  test('upgrade from 0.8.0 data (schema 3): people keep everything and gain the new columns', () async {
+    await makeOldFile(version: 3);
+    final db = await openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain());
+    final repo = Repository(db);
+    final sam = (await repo.listPeople()).single;
+    expect(sam.displayName, 'Sam');
+    expect(sam.instagram, isNull);
+    expect(sam.unansweredAt, isNull);
+    await repo.updatePerson(sam.id, const PeopleCompanion(instagram: Value('sam.r')));
+    expect((await repo.getPerson(sam.id))!.instagram, 'sam.r');
+    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v3-to-v4')), hasLength(1));
     await db.close();
   });
 

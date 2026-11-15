@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/device_sources.dart';
 import '../../data/providers.dart';
+import '../../domain/phone.dart';
 
 String _digits(String? s) => (s ?? '').replaceAll(RegExp(r'\D'), '');
 
@@ -25,6 +26,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
   String _query = '';
   bool _busy = false;
   bool _loading = true;
+  String? _deviceIso; // this phone's country, for numbers saved without a code
 
   @override
   void initState() {
@@ -39,6 +41,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
       if (mounted) setState(() { _access = access; _loading = false; });
       return;
     }
+    _deviceIso = countryOfZone(await ref.read(deviceTimezoneProvider).current());
     final contacts = await ref.read(contactsSourceProvider).load();
     final people = await ref.read(repositoryProvider).listPeople();
     if (!mounted) return;
@@ -47,16 +50,18 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
       _contacts = contacts;
       _existingPhones = {
         for (final p in people)
-          if (_digits(p.phone ?? p.contactMethodValue).length >= 7)
-            _digits(p.phone ?? p.contactMethodValue)
+          if (_key(p.phone ?? p.contactMethodValue).length >= 7) _key(p.phone ?? p.contactMethodValue)
       };
       _existingNames = {for (final p in people) p.displayName.toLowerCase()};
       _loading = false;
     });
   }
 
+  /// A number in one form for comparing: international digits when readable.
+  String _key(String? phone) => whatsappDigits(phone, homeIso: _deviceIso) ?? _digits(phone);
+
   bool _already(PhoneContact c) {
-    final d = _digits(c.phone);
+    final d = _key(c.phone);
     if (d.length >= 7) return _existingPhones.contains(d);
     return _existingNames.contains(c.name.toLowerCase());
   }
@@ -67,7 +72,14 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
     final zone = await ref.read(deviceTimezoneProvider).current();
     final chosen = _contacts.where((c) => _picked.contains(c.id)).toList();
     await repo.createPeople(
-      [for (final c in chosen) (displayName: c.name, phone: c.phone)],
+      [
+        for (final c in chosen)
+          (
+            displayName: c.name,
+            // International form, reading a number without a code in this phone's country.
+            phone: parsePhone(c.phone ?? '', boxIso: _deviceIso, homeIso: _deviceIso).stored,
+          )
+      ],
       groupId: _groupId!,
       timezone: zone,
       timezoneConfirmed: false,

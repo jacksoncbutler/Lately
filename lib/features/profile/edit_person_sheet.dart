@@ -6,9 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/providers.dart';
+import '../../domain/phone.dart';
 import '../../domain/profile_format.dart';
+import '../../domain/reach.dart';
 import '../../ui/birthday_picker.dart';
 import '../../ui/city_picker.dart';
+import '../../ui/phone_field.dart';
+import 'contact_action.dart';
 
 enum EditOutcome { saved, archived, restored, deleted }
 
@@ -33,14 +37,15 @@ class EditPersonSheet extends ConsumerStatefulWidget {
 
 class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
   late final _name = TextEditingController(text: widget.person.displayName);
-  late final _contact = TextEditingController(
-      text: widget.person.contactMethodValue ?? widget.person.phone ?? '');
+  late final Reach _reach = Reach(widget.person);
+  late final _instagram = TextEditingController(text: _reach.instagram ?? '');
+  late Channel _channel = _reach.channel;
+  late PhoneValue _phone = PhoneValue(PhoneParse(raw: _reach.phone ?? ''));
   late final _interval = TextEditingController(
       text: widget.person.intervalOverrideDays?.toString() ?? '');
   late final _hometown = TextEditingController(text: widget.person.hometown ?? '');
   late final _socials = TextEditingController(text: _socialsText(widget.person.socials));
   late String _groupId = widget.person.groupId;
-  late String _method = widget.person.contactMethodType == 'call' ? 'call' : 'text';
   late String? _zone = widget.person.timezoneConfirmed ? widget.person.timezone : null;
   late String? _birthday = widget.person.birthday;
   bool _confirmDelete = false;
@@ -56,7 +61,7 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
 
   @override
   void dispose() {
-    for (final c in [_name, _contact, _interval, _hometown, _socials]) {
+    for (final c in [_name, _instagram, _interval, _hometown, _socials]) {
       c.dispose();
     }
     super.dispose();
@@ -67,17 +72,38 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
     if (r != null) setState(() => _birthday = r.value);
   }
 
+  Future<void> _pause(PersonRow p) async {
+    final now = ref.read(nowProvider)();
+    final tomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    final d = await showDatePicker(
+      context: context,
+      initialDate: tomorrow.add(const Duration(days: 6)),
+      firstDate: tomorrow,
+      lastDate: tomorrow.add(const Duration(days: 730)),
+      // Pick from the calendar; no typing dates with slashes.
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
+      helpText: 'Pause until which day?',
+    );
+    if (d == null) return;
+    // Back on the morning of that day (midnight, your time).
+    await ref.read(repositoryProvider).snoozeUntil(p.id, DateTime(d.year, d.month, d.day).toUtc());
+    if (mounted) Navigator.pop(context, EditOutcome.saved);
+  }
+
   Future<void> _save() async {
-    final contact = _contact.text.trim();
+    final phone = _phone.stored;
+    final ig = instagramUsername(_instagram.text);
     final socials = _socials.text.trim();
     await ref.read(repositoryProvider).updatePerson(
           widget.person.id,
           PeopleCompanion(
             displayName: Value(_name.text.trim()),
             groupId: Value(_groupId),
-            contactMethodType: Value(_method),
-            contactMethodValue: Value(contact.isEmpty ? null : contact),
-            phone: Value(contact.isEmpty ? null : contact),
+            contactMethodType: Value(channelType(_channel)),
+            // The value mirrors what the preferred channel uses (older readers).
+            contactMethodValue: Value(_channel == Channel.instagram ? ig : phone),
+            phone: Value(phone),
+            instagram: Value(ig),
             timezone: Value(_zone ?? widget.person.timezone),
             timezoneConfirmed: Value(_zone != null),
             birthday: Value(_birthday),
@@ -137,25 +163,38 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
                   ),
               ]),
               label('How you reach them'),
-              Row(children: [
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'text', label: Text('Text')),
-                    ButtonSegment(value: 'call', label: Text('Call')),
-                  ],
-                  selected: {_method},
-                  onSelectionChanged: (s) => setState(() => _method = s.first),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    key: const Key('edit-contact'),
-                    controller: _contact,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(hintText: 'Number or handle'),
+              Wrap(spacing: 8, children: [
+                for (final c in Channel.values)
+                  ChoiceChip(
+                    key: Key('channel-${c.name}'),
+                    label: Text(channelLabel(c)),
+                    selected: _channel == c,
+                    onSelected: (_) => setState(() => _channel = c),
                   ),
-                ),
               ]),
+              const SizedBox(height: 8),
+              Text('Contact opens straight to ${channelLabel(_channel)}.', style: t.bodySmall),
+              const SizedBox(height: 8),
+              PhoneField(
+                key: const Key('edit-phone'),
+                initial: _reach.phone,
+                homeIso: countryOfZone(_zone),
+                onChanged: (v) => setState(() => _phone = v),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                key: const Key('edit-instagram'),
+                controller: _instagram,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: 'Instagram username',
+                  prefixText: '@',
+                  errorText: _instagram.text.trim().isEmpty || instagramUsername(_instagram.text) != null
+                      ? null
+                      : "That doesn't look like a username",
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
               label('Where they are'),
               CityPicker(
                 zone: _zone,
@@ -187,12 +226,47 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
               ),
               label('Hometown'),
               TextField(key: const Key('edit-hometown'), controller: _hometown),
-              label('Socials'),
+              label('Other socials'),
               TextField(key: const Key('edit-socials'), controller: _socials),
               const SizedBox(height: 22),
               const Divider(),
               label('Manage'),
               if (p.archivedAt == null) ...[
+                if (p.snoozedUntil != null && p.snoozedUntil!.isAfter(ref.read(nowProvider)())) ...[
+                  Text('Paused until ${shortDate(p.snoozedUntil!, ref.read(nowProvider)())}',
+                      key: const Key('paused-text'), style: t.bodyMedium),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const Key('pause-change'),
+                        onPressed: () => _pause(p),
+                        child: const Text('Change date'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        key: const Key('pause-resume'),
+                        onPressed: () async {
+                          await repo.clearSnooze(p.id);
+                          if (context.mounted) Navigator.pop(context, EditOutcome.saved);
+                        },
+                        child: const Text('Resume'),
+                      ),
+                    ),
+                  ]),
+                ] else
+                  OutlinedButton(
+                    key: const Key('pause-button'),
+                    onPressed: () => _pause(p),
+                    child: const Text('Pause suggestions until…'),
+                  ),
+                const SizedBox(height: 4),
+                Text(
+                    'Hides them from Home until that day. They stay in People, and you can resume any time.',
+                    style: t.bodySmall),
+                const SizedBox(height: 16),
                 OutlinedButton(
                   onPressed: () async {
                     await repo.archivePerson(p.id);
@@ -261,7 +335,10 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
           child: SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _name.text.trim().isEmpty ? null : _save,
+              onPressed: _name.text.trim().isEmpty ||
+                      (_instagram.text.trim().isNotEmpty && instagramUsername(_instagram.text) == null)
+                  ? null
+                  : _save,
               child: const Text('Save changes'),
             ),
           ),

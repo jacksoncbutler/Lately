@@ -145,7 +145,7 @@ void main() {
       expect(tester.widget<FilledButton>(create).onPressed, isNull);
 
       await tester.enterText(find.widgetWithText(TextField, 'First name'), 'Sam');
-      await tester.enterText(find.widgetWithText(TextField, 'Number or handle'), '+351 555 0142');
+      await tester.enterText(find.byKey(const Key('phone-field')), '+351 555 0142');
       await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'lisb');
       await tester.pumpAndSettle();
       expect(find.text('Lisbon, Portugal · 2:10 pm there'), findsOneWidget);
@@ -164,9 +164,62 @@ void main() {
       expect(sam.timezone, 'Europe/Lisbon');
       expect(sam.timezoneConfirmed, isTrue);
       expect(sam.contactMethodType, 'text');
-      expect(sam.contactMethodValue, '+351 555 0142');
+      expect(sam.contactMethodValue, '+3515550142');
+      expect(sam.phone, '+3515550142');
       expect(sam.lastTalkedEstimate!.toUtc(), fixedNow.subtract(const Duration(days: 30)));
       expect((await repo.getGroup(sam.groupId))!.name, 'Friends'); // default group
+    });
+
+    testApp('add a person: the country box starts at the US and follows the city you pick', (tester) async {
+      await pumpApp(tester);
+      await tester.tap(find.text('Add someone'));
+      await tester.pumpAndSettle();
+      expect(find.text('🇺🇸 +1'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'lisb');
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Lisbon, Portugal'));
+      await tester.pumpAndSettle();
+      expect(find.text('🇵🇹 +351'), findsOneWidget);
+    });
+
+    testApp('add a person: a leading 0 means their country, and WhatsApp can be the preferred app', (tester) async {
+      await pumpApp(tester);
+      await tester.tap(find.text('Add someone'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'First name'), 'Ana');
+      await tester.tap(find.byKey(const Key('channel-whatsapp')));
+      await tester.enterText(find.byKey(const Key('phone-field')), '0912345678');
+      await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'lisb');
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Lisbon, Portugal'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Saved as +351 912 345 678'), findsOneWidget);
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Create'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+      await settle(tester);
+      final ana = (await repo.listPeople()).single;
+      expect((ana.contactMethodType, ana.phone, ana.contactMethodValue), ('whatsapp', '+351912345678', '+351912345678'));
+    });
+
+    testApp('add a person: Instagram as the preferred app takes a username', (tester) async {
+      await pumpApp(tester);
+      await tester.tap(find.text('Add someone'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'First name'), 'Ana');
+      expect(find.byKey(const Key('add-instagram')), findsNothing);
+      await tester.tap(find.byKey(const Key('channel-instagram')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('add-instagram')), '@ana.s');
+      await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'tokyo');
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Tokyo'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Create'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+      await settle(tester);
+      final ana = (await repo.listPeople()).single;
+      expect((ana.contactMethodType, ana.contactMethodValue, ana.instagram), ('instagram', 'ana.s', 'ana.s'));
+      expect(ana.phone, isNull);
     });
 
     testApp('unanswered last-talked defaults to about six months', (tester) async {
@@ -252,7 +305,7 @@ void main() {
         expect((await repo.getGroup(p.groupId))!.name, 'Siblings');
         expect(p.lastTalkedEstimate, isNull); // set per person, not for the batch
       }
-      expect(batch.firstWhere((p) => p.displayName == 'Alex').phone, '+61 555 0103');
+      expect(batch.firstWhere((p) => p.displayName == 'Alex').phone, '+615550103'); // saved in international form
       expect(batch.firstWhere((p) => p.displayName == 'Marcus').phone, isNull);
 
       // The batch screen has no shared "last talked" question.
@@ -300,6 +353,44 @@ void main() {
       expect(jo.timezone, 'America/Chicago');
       expect(jo.timezoneConfirmed, isTrue);
       expect(jo.lastTalkedEstimate!.toUtc(), fixedNow.subtract(const Duration(days: 180)));
+    });
+
+    testApp('bulk add: numbers without a country code are read in this phone\'s country', (tester) async {
+      contacts = FakeContacts(ContactsAccess.granted, const [
+        PhoneContact(id: '1', name: 'Local', phone: '(415) 555-2671'),
+        PhoneContact(id: '2', name: 'Trunk', phone: '0412 345 678'),
+      ]);
+      await repo.createPerson(displayName: 'Seed', groupId: (await repo.listGroups()).first.id, timezone: 'UTC', contactMethodType: 'text', timezoneConfirmed: true);
+      await pumpApp(tester);
+      await tester.tap(find.byKey(const Key('tab-people')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('add-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add from contacts'));
+      await settle(tester);
+      await tester.tap(find.text('Local'));
+      await tester.tap(find.text('Trunk'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add 2 people'));
+      await settle(tester);
+      final all = {for (final p in await repo.listPeople()) p.displayName: p};
+      expect(all['Local']!.phone, '+14155552671'); // device is in Chicago: US
+      expect(all['Trunk']!.phone, startsWith('+1')); // a leading 0 is dropped and read as a US-style number
+    });
+
+    testApp('bulk add: someone already saved in another form of the same number is recognised', (tester) async {
+      contacts = FakeContacts(ContactsAccess.granted, const [
+        PhoneContact(id: '1', name: 'Dup', phone: '(415) 555-2671'),
+      ]);
+      await repo.createPerson(displayName: 'Mom', groupId: (await repo.listGroups()).first.id, timezone: 'America/Chicago', contactMethodType: 'text', phone: '+14155552671', contactMethodValue: '+14155552671', timezoneConfirmed: true);
+      await pumpApp(tester);
+      await tester.tap(find.byKey(const Key('tab-people')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('add-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add from contacts'));
+      await settle(tester);
+      expect(find.text('Already added'), findsOneWidget);
     });
 
     testApp('bulk add: permission is only asked when it starts, and denial is explained', (tester) async {

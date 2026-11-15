@@ -244,4 +244,42 @@ void main() {
     'importantDates': [],
     'customBlocks': [],
   });
+
+  // 1.1: preferred channel (WhatsApp), an Instagram username, a phone number in
+  // international form, and "didn't answer".
+  write('backup_v1_1_channels.json', '1.1', {
+    'settings': settings(),
+    'groups': [group('g-001', 'Friends', 30)],
+    'people': [
+      {
+        'id': 'p-ana',
+        'displayName': 'Ana',
+        'groupId': 'g-001',
+        'timezone': 'Europe/Lisbon',
+        'timezoneConfirmed': true,
+        'contactMethod': {'type': 'whatsapp', 'value': '+351912345678'},
+        'phone': '+351912345678',
+        'instagram': 'ana.s',
+        'unansweredAt': '2026-11-10T18:30:00Z',
+        'snoozedUntil': '2026-11-20T00:00:00Z',
+        'createdAt': t0,
+        'updatedAt': '2026-11-10T18:30:00Z',
+      },
+      {
+        'id': 'p-ig',
+        'displayName': 'Ig Only',
+        'groupId': 'g-001',
+        'timezone': 'UTC',
+        'contactMethod': {'type': 'instagram', 'value': 'ig.only'},
+        'instagram': 'ig.only',
+        'createdAt': t0,
+        'updatedAt': t0,
+      },
+    ],
+    'chats': [],
+    'lines': [],
+    'familyMembers': [],
+    'importantDates': [],
+    'customBlocks': [],
+  });
 }

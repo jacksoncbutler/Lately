@@ -248,7 +248,7 @@ void main() {
       expect(find.text('Asleep'), findsOneWidget);
       expect(find.text('Talked today'), findsOneWidget);
       expect(find.text('Not due'), findsOneWidget);
-      expect(find.text('Snoozed'), findsOneWidget);
+      expect(find.text('Paused'), findsOneWidget);
       expect(find.text('Skipped'), findsOneWidget);
     });
 

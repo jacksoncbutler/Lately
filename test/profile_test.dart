@@ -7,26 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lately/data/database.dart';
 import 'package:lately/data/device_sources.dart';
-import 'package:lately/data/phone_launcher.dart';
 import 'package:lately/data/providers.dart';
 import 'package:lately/data/repository.dart';
 import 'package:lately/domain/timezones.dart';
 import 'package:lately/features/profile/profile_screen.dart';
 import 'package:lately/ui/theme.dart';
 
-class FakeLauncher implements PhoneLauncher {
-  final calls = <String>[];
-  @override
-  Future<bool> call(String number) async {
-    calls.add('call:$number');
-    return true;
-  }
-  @override
-  Future<bool> message(String number) async {
-    calls.add('sms:$number');
-    return true;
-  }
-}
+import 'support/fakes.dart';
 
 class _Tz implements DeviceTimezone {
   @override
@@ -150,8 +137,8 @@ void main() {
       await tester.tap(find.byKey(const Key('profile-more')));
       await tester.pumpAndSettle();
       expect(find.text('Porto'), findsOneWidget);
-      expect(find.text('@sam.r'), findsOneWidget);
-      expect(find.text('+351 555 0142'), findsOneWidget);
+      expect(find.text('@sam.r'), findsOneWidget); // other socials
+      expect(find.descendant(of: find.byKey(const Key('fact-Number')), matching: find.textContaining('+351')), findsOneWidget);
       expect(find.text('Fewer details'), findsOneWidget);
     });
 
@@ -477,11 +464,11 @@ void main() {
 
       await tester.enterText(find.byKey(const Key('edit-name')), 'Samuel');
       await tester.tap(find.textContaining('Parents'));
-      await tester.enterText(find.byKey(const Key('edit-contact')), '+351 555 0199');
+      await tester.enterText(find.byKey(const Key('phone-field')), '+351 912 345 678');
       await tester.enterText(find.byKey(const Key('edit-interval')), '10');
       await tester.enterText(find.byKey(const Key('edit-hometown')), 'Porto');
       await tester.enterText(find.byKey(const Key('edit-socials')), '@sam.r');
-      await tester.tap(find.text('Call'));
+      await tester.tap(find.byKey(const Key('channel-call')));
       await pickBirthday(tester, 'Jan', '14');
       await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
       await settle(tester);
@@ -490,7 +477,8 @@ void main() {
       expect(p.displayName, 'Samuel');
       expect(p.groupId, parents);
       expect(p.contactMethodType, 'call');
-      expect(p.contactMethodValue, '+351 555 0199');
+      expect(p.contactMethodValue, '+351912345678');
+      expect(p.phone, '+351912345678');
       expect(p.intervalOverrideDays, 10);
       expect(p.hometown, 'Porto');
       expect(p.socials, '["@sam.r"]');
@@ -694,44 +682,329 @@ void main() {
     });
   });
 
-  group('Contact', () {
-    testApp('Message opens the messages app and remembers who you tried', (tester) async {
+  group('Contact: straight to their preferred app', () {
+    Future<void> prefer(String type, {String? instagram}) =>
+        repo.updatePerson(sam, PeopleCompanion(contactMethodType: Value(type), instagram: Value(instagram)));
+
+    testApp('the default is Text: one tap, no chooser, and it remembers who you tried', (tester) async {
       await openProfile(tester);
       await tester.tap(find.byKey(const Key('profile-contact')));
       await settle(tester);
-      expect(find.text('Reach Sam'), findsOneWidget);
-      await tester.tap(find.text('Message'));
-      await settle(tester);
       expect(launcher.calls, ['sms:+3515550142']);
+      expect(find.textContaining('Reach'), findsNothing); // no chooser sheet
       final s = await repo.getSettings();
       expect(s.recentContactPersonId, sam);
       expect(s.recentContactAt, isNotNull);
     });
 
     testApp('Call opens the phone app', (tester) async {
+      await prefer('call');
       await openProfile(tester);
       await tester.tap(find.byKey(const Key('profile-contact')));
       await settle(tester);
-      await tester.tap(find.text('Call'));
-      await settle(tester);
       expect(launcher.calls, ['call:+3515550142']);
+    });
+
+    testApp('WhatsApp opens the chat, with the number as digits only', (tester) async {
+      await prefer('whatsapp');
+      await openProfile(tester);
+      expect(find.text('WhatsApp'), findsOneWidget); // Prefers
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['whatsapp:3515550142']);
+    });
+
+    testApp('a number saved without a country code is read in their country for WhatsApp', (tester) async {
+      await prefer('whatsapp');
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value('912345678'), contactMethodValue: Value('912345678')));
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['whatsapp:351912345678']); // Lisbon: +351
+    });
+
+    testApp('Instagram opens the DM', (tester) async {
+      await prefer('instagram', instagram: 'sam.r');
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['ig-dm:sam.r']);
+    });
+
+    testApp('if the app cannot be opened it says so, and still remembers the attempt', (tester) async {
+      launcher = FakeLauncher(works: false);
+      await prefer('whatsapp');
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(find.text('Could not open WhatsApp. Is it installed?'), findsOneWidget);
     });
 
     testApp('with no number the button is disabled and says what to do', (tester) async {
       final p = await repo.createPerson(displayName: 'Nobody', groupId: groupId, timezone: 'UTC', timezoneConfirmed: true, contactMethodType: 'text');
       await openProfile(tester, id: p);
       expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
-      expect(find.textContaining('Add a number or handle'), findsOneWidget);
+      expect(find.textContaining('Add a number to reach them.'), findsOneWidget);
     });
 
-    testApp('a handle is shown but cannot be dialled', (tester) async {
-      await repo.updatePerson(sam, const PeopleCompanion(contactMethodValue: Value('@sam.r')));
+    testApp('Instagram preferred but no username: disabled, and says what to add', (tester) async {
+      await prefer('instagram');
       await openProfile(tester);
-      await tester.tap(find.byKey(const Key('profile-contact')));
+      expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
+      expect(find.textContaining('Add their Instagram username'), findsOneWidget);
+    });
+
+    testApp('a handle in the number box is not a number, so Text is disabled', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value('@sam.r'), contactMethodValue: Value('@sam.r')));
+      await openProfile(tester);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
+    });
+  });
+
+  group('tap their number or Instagram in More details', () {
+    testApp('the number offers Call, Text and WhatsApp, with the preferred one highlighted', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Number')));
       await settle(tester);
+      expect(find.byKey(const Key('reach-call')), findsOneWidget);
+      expect(find.byKey(const Key('reach-text')), findsOneWidget);
+      expect(find.byKey(const Key('reach-whatsapp')), findsOneWidget);
+      expect(find.byType(FilledButton).evaluate().where((e) => (e.widget as FilledButton).key == const Key('reach-text')), isNotEmpty); // Text is the preference
+      await tester.tap(find.byKey(const Key('reach-whatsapp')));
+      await settle(tester);
+      expect(launcher.calls, ['whatsapp:3515550142']);
+      expect((await repo.getSettings()).recentContactPersonId, sam);
+    });
+
+    testApp('Call from the number sheet', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Number')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('reach-call')));
+      await settle(tester);
+      expect(launcher.calls, ['call:+3515550142']);
+    });
+
+    testApp('Instagram offers a DM or their profile; only the DM counts as trying to talk', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(instagram: Value('sam.r')));
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
       expect(find.text('@sam.r'), findsOneWidget);
-      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Message')).onPressed, isNull);
-      expect(launcher.calls, isEmpty);
+      await tester.tap(find.byKey(const Key('fact-Instagram')));
+      await settle(tester);
+      expect(find.text('Open DM'), findsOneWidget);
+      expect(find.text('Open profile'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('ig-profile')));
+      await settle(tester);
+      expect(launcher.calls, ['ig-profile:sam.r']);
+      expect((await repo.getSettings()).recentContactPersonId, isNull);
+
+      await tester.tap(find.byKey(const Key('fact-Instagram')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('ig-dm')));
+      await settle(tester);
+      expect(launcher.calls, ['ig-profile:sam.r', 'ig-dm:sam.r']);
+      expect((await repo.getSettings()).recentContactPersonId, sam);
+    });
+
+    testApp('with no Instagram saved the row is plain text', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Instagram')));
+      await settle(tester);
+      expect(find.text('Open DM'), findsNothing);
+    });
+  });
+
+  group('number box and country code (Edit person)', () {
+    Future<void> openEdit(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('profile-edit')));
+      await settle(tester);
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+    }
+
+    testApp('an international number fills in its own country', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('phone-field')), '+44 7400 123456');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('+44'), findsWidgets); // the box now shows the UK
+      expect(find.byKey(const Key('phone-hint')), findsOneWidget);
+      await save(tester);
+      expect((await repo.getPerson(sam))!.phone, '+447400123456');
+    });
+
+    testApp('a leading 0 means their own country (Portugal here), and the 0 goes', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('phone-field')), '0912345678');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Saved as +351 912 345 678'), findsOneWidget);
+      await save(tester);
+      expect((await repo.getPerson(sam))!.phone, '+351912345678');
+    });
+
+    testApp('with no city yet the box starts at the US, then follows the city you choose', (tester) async {
+      final jo = await repo.createPerson(displayName: 'Jo', groupId: groupId, timezone: 'America/Chicago', timezoneConfirmed: false, contactMethodType: 'text');
+      await openProfile(tester, id: jo);
+      await openEdit(tester);
+      expect(find.text('🇺🇸 +1'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'tokyo');
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Tokyo'));
+      await tester.pumpAndSettle();
+      expect(find.text('🇯🇵 +81'), findsOneWidget);
+    });
+
+    testApp('the country can be searched by name or by code, and then sticks', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('country-button')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('country-search')), 'brazil');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('country-BR')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('country-search')), '+33');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('country-FR')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('country-search')), 'brazil');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('country-BR')));
+      await tester.pumpAndSettle();
+      expect(find.text('🇧🇷 +55'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('phone-field')), '11 99999 8888');
+      await tester.pumpAndSettle();
+      await save(tester);
+      expect((await repo.getPerson(sam))!.phone, '+5511999998888');
+    });
+
+    testApp('the sheet lists their country and the US first', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('country-button')));
+      await tester.pumpAndSettle();
+      final pt = tester.getTopLeft(find.byKey(const Key('country-PT'))).dy;
+      final us = tester.getTopLeft(find.byKey(const Key('country-US'))).dy;
+      final af = tester.getTopLeft(find.byKey(const Key('country-AF'))).dy;
+      expect(pt, lessThan(us));
+      expect(us, lessThan(af));
+    });
+
+    testApp('an existing number opens in its own country, written the way that country writes it', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value('+351912345678'), contactMethodValue: Value('+351912345678')));
+      await openProfile(tester);
+      await openEdit(tester);
+      expect(find.text('🇵🇹 +351'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('phone-field'))).controller!.text, '912 345 678');
+    });
+
+    testApp('choosing WhatsApp and an Instagram link saves the username', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('channel-whatsapp')));
+      await tester.pumpAndSettle();
+      expect(find.text('Contact opens straight to WhatsApp.'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('edit-instagram')), 'https://www.instagram.com/sam.r/');
+      await tester.pumpAndSettle();
+      await save(tester);
+      final p = (await repo.getPerson(sam))!;
+      expect(p.contactMethodType, 'whatsapp');
+      expect(p.instagram, 'sam.r');
+    });
+
+    testApp('an Instagram entry that is not a username is explained and blocks Save', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('edit-instagram')), '#nope');
+      await tester.pumpAndSettle();
+      expect(find.text("That doesn't look like a username"), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save changes')).onPressed, isNull);
+    });
+
+    testApp('an Instagram contact keeps the username as its value', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('channel-instagram')));
+      await tester.enterText(find.byKey(const Key('edit-instagram')), '@sam.r');
+      await tester.pumpAndSettle();
+      await save(tester);
+      final p = (await repo.getPerson(sam))!;
+      expect((p.contactMethodType, p.contactMethodValue, p.instagram), ('instagram', 'sam.r', 'sam.r'));
+    });
+  });
+
+  group('Pause suggestions (Edit person > Manage)', () {
+    Future<void> openEdit(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('profile-edit')));
+      await settle(tester);
+    }
+
+    testApp('pick a date from a calendar: they are hidden from Home until then, with a way back', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.byKey(const Key('pause-button')), 300, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.byKey(const Key('pause-button')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.edit_outlined), findsNothing); // calendar only, no typed date
+      await tester.tap(find.text('20'));
+      await tester.tap(find.text('OK'));
+      await settle(tester);
+      final until = (await repo.getPerson(sam))!.snoozedUntil!.toLocal();
+      expect((until.month, until.day, until.hour), (11, 20, 0)); // the start of that day
+      expect(find.text('Paused until Nov 20. Not suggested on Home.'), findsOneWidget);
+
+      await tester.tap(find.text('Resume'));
+      await settle(tester);
+      expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
+      expect(find.textContaining('Paused until'), findsNothing);
+    });
+
+    testApp('the sheet shows the date, and can change it or resume', (tester) async {
+      await repo.snoozeUntil(sam, DateTime(2026, 11, 22).toUtc());
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.byKey(const Key('paused-text')), 300, scrollable: find.byType(Scrollable).last);
+      expect(find.text('Paused until Nov 22'), findsOneWidget);
+      expect(find.byKey(const Key('pause-button')), findsNothing);
+      await tester.tap(find.byKey(const Key('pause-resume')));
+      await settle(tester);
+      expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
+    });
+
+    testApp('today and the past cannot be picked', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.byKey(const Key('pause-button')), 300, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.byKey(const Key('pause-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('11')); // today (the 11th) is not selectable: nothing changes
+      await tester.tap(find.text('OK'));
+      await settle(tester);
+      final until = (await repo.getPerson(sam))!.snoozedUntil!.toLocal();
+      expect(until.day, 18); // still the suggested week-out date, not the 11th
+    });
+
+    testApp('Pause is for people you still want, so archived people do not show it', (tester) async {
+      await repo.archivePerson(sam);
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.text('Restore Sam'), 300, scrollable: find.byType(Scrollable).last);
+      expect(find.byKey(const Key('pause-button')), findsNothing);
     });
   });
 }

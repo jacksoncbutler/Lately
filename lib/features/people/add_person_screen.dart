@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../domain/constants.dart';
+import '../../domain/phone.dart';
+import '../../domain/reach.dart';
 import '../../ui/city_picker.dart';
+import '../../ui/phone_field.dart';
 
 /// Single add: the minimum to start (name, group, how to reach, where they
 /// are, roughly when you last talked).
@@ -16,9 +19,11 @@ class AddPersonScreen extends ConsumerStatefulWidget {
 
 class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
   final _name = TextEditingController();
-  final _contact = TextEditingController();
+  final _instagram = TextEditingController();
+  PhoneValue _phone = PhoneValue(PhoneParse(raw: ''));
+  int _formGen = 0; // bumps to clear the number box between people
   String? _groupId;
-  String _method = 'text';
+  Channel _channel = Channel.text;
   String? _zone;
   int? _lastTalkedDays;
   String? _deviceZone;
@@ -35,7 +40,7 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
   @override
   void dispose() {
     _name.dispose();
-    _contact.dispose();
+    _instagram.dispose();
     super.dispose();
   }
 
@@ -46,15 +51,17 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
     final repo = ref.read(repositoryProvider);
     final now = ref.read(nowProvider)();
     final days = _lastTalkedDays ?? Tune.defaultLastTalkedDays;
-    final value = _contact.text.trim();
+    final phone = _phone.stored;
+    final ig = instagramUsername(_instagram.text);
     await repo.createPerson(
       displayName: _name.text.trim(),
       groupId: _groupId!,
       timezone: _zone!,
       timezoneConfirmed: true,
-      contactMethodType: _method,
-      contactMethodValue: value.isEmpty ? null : value,
-      phone: value.isEmpty ? null : value,
+      contactMethodType: channelType(_channel),
+      contactMethodValue: _channel == Channel.instagram ? ig : phone,
+      phone: phone,
+      instagram: ig,
       lastTalkedEstimate: now.subtract(Duration(days: days)),
     );
     ref.invalidate(peopleProvider);
@@ -63,7 +70,10 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
     if (addMore) {
       setState(() {
         _name.clear();
-        _contact.clear();
+        _instagram.clear();
+        _phone = PhoneValue(PhoneParse(raw: ''));
+        _formGen++;
+        _channel = Channel.text;
         _zone = null;
         _lastTalkedDays = null;
         _busy = false;
@@ -109,25 +119,31 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
           const SizedBox(height: 16),
           Text('How you reach them', style: t.labelLarge),
           const SizedBox(height: 4),
-          Row(children: [
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'text', label: Text('Text')),
-                ButtonSegment(value: 'call', label: Text('Call')),
-              ],
-              selected: {_method},
-              onSelectionChanged: (s) => setState(() => _method = s.first),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _contact,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                    hintText: 'Number or handle', border: OutlineInputBorder()),
+          Wrap(spacing: 8, children: [
+            for (final c in Channel.values)
+              ChoiceChip(
+                key: Key('channel-${c.name}'),
+                label: Text(channelLabel(c)),
+                selected: _channel == c,
+                onSelected: (_) => setState(() => _channel = c),
               ),
-            ),
           ]),
+          const SizedBox(height: 8),
+          PhoneField(
+            key: ValueKey('phone-$_formGen'),
+            initial: null,
+            homeIso: countryOfZone(_zone),
+            onChanged: (v) => _phone = v,
+          ),
+          if (_channel == Channel.instagram) ...[
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('add-instagram'),
+              controller: _instagram,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Instagram username', prefixText: '@'),
+            ),
+          ],
           const SizedBox(height: 16),
           Text('Where they are', style: t.labelLarge),
           const SizedBox(height: 4),

@@ -6,15 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../data/repository.dart';
+import '../../domain/phone.dart';
 import '../../domain/profile_format.dart';
+import '../../domain/reach.dart';
 import '../../domain/timezones.dart';
 import '../../ui/theme.dart';
 import 'edit_person_sheet.dart';
 import 'finish_setup_sheet.dart';
-import 'reach_sheet.dart';
 import '../log/chat_detail_sheet.dart';
 import '../log/log_sheet.dart';
+import 'contact_action.dart';
 import 'profile_blocks.dart';
+import 'reach_options.dart';
 
 /// A person's profile: header, key facts, Next time, blocks, recent chats.
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -67,8 +70,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             null, (a, b) => a == null || b.isAfter(a) ? b : a);
     final lastPerson = lastOf((x) => x.type == 'person');
     final lastRemote = lastOf((x) => x.type == 'call' || x.type == 'text');
-    final value = person.contactMethodValue ?? person.phone;
-    final hasContact = value != null && value.trim().isNotEmpty;
+    final reach = Reach(person);
+    final hasContact = reach.canContact;
+    final paused = person.snoozedUntil != null && person.snoozedUntil!.isAfter(now());
     final socials = () {
       if (person.socials == null) return null;
       try {
@@ -101,6 +105,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 text: 'Archived. Not suggested on Home.',
                 action: 'Restore',
                 onAction: () => repo.restorePerson(person.id),
+              ),
+            if (person.archivedAt == null && paused)
+              _Strip(
+                text: 'Paused until ${shortDate(person.snoozedUntil!, now())}. Not suggested on Home.',
+                action: 'Resume',
+                onAction: () => repo.clearSnooze(person.id),
               ),
             if (needsFinishing(person))
               _Strip(
@@ -146,7 +156,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 flex: 13,
                 child: FilledButton(
                   key: const Key('profile-contact'),
-                  onPressed: hasContact ? () => showReachSheet(context, person) : null,
+                  onPressed: hasContact ? () => contactPerson(context, ref, person) : null,
                   child: const Text('Contact'),
                 ),
               ),
@@ -164,7 +174,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(children: [
-                  Text('Add a number or handle to reach them. ', style: t.bodySmall),
+                  Text('${missingFor(reach.channel)} ', style: t.bodySmall),
                   GestureDetector(
                     onTap: () => _edit(person),
                     child: Text('Edit',
@@ -179,23 +189,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                 child: Column(children: [
                   _FactGrid(facts: [
-                    ('Birthday', birthdayLabel(person.birthday) ?? 'Not added'),
-                    ('Interval', interval == null ? '' : 'Every $interval days'),
-                    ('Timezone',
-                        needsFinishing(person) ? 'Not set' : zoneLabel(person.timezone)),
-                    ('Prefers', person.contactMethodType == 'call' ? 'Call' : 'Text'),
-                    ('Last in person',
-                        lastPerson == null ? 'None yet' : shortDate(lastPerson, now())),
-                    ('Last call or text',
-                        lastRemote == null ? 'None yet' : shortDate(lastRemote, now())),
+                    _Fact('Birthday', birthdayLabel(person.birthday) ?? 'Not added'),
+                    _Fact('Interval', interval == null ? '' : 'Every $interval days'),
+                    _Fact('Timezone', needsFinishing(person) ? 'Not set' : zoneLabel(person.timezone)),
+                    _Fact('Prefers', channelLabel(reach.channel)),
+                    _Fact('Last in person', lastPerson == null ? 'None yet' : shortDate(lastPerson, now())),
+                    _Fact('Last call or text', lastRemote == null ? 'None yet' : shortDate(lastRemote, now())),
                   ]),
                   if (_more)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: _FactGrid(facts: [
-                        ('Number or handle', hasContact ? value : 'Not added'),
-                        ('Hometown', person.hometown ?? 'Not added'),
-                        ('Socials', socials ?? 'Not added'),
+                        _Fact('Number', reach.phone == null ? 'Not added' : _numberText(reach),
+                            onTap: reach.phone == null ? null : () => showNumberOptions(context, person)),
+                        _Fact('Instagram',
+                            instagramUsername(reach.instagram) == null
+                                ? 'Not added'
+                                : '@${instagramUsername(reach.instagram)}',
+                            onTap: instagramUsername(reach.instagram) == null
+                                ? null
+                                : () => showInstagramOptions(context, person)),
+                        _Fact('Hometown', person.hometown ?? 'Not added'),
+                        _Fact('Other socials', socials ?? 'Not added'),
                       ]),
                     ),
                   const Divider(),
@@ -312,9 +327,26 @@ class _Strip extends StatelessWidget {
   }
 }
 
+class _Fact {
+  const _Fact(this.label, this.value, {this.onTap});
+  final String label;
+  final String value;
+
+  /// When set, the value is tappable (their number and Instagram).
+  final VoidCallback? onTap;
+}
+
+/// "+351 912 345 678" for a stored international number, else as stored.
+String _numberText(Reach r) {
+  final p = parsePhone(r.phone ?? '', boxIso: r.homeIso, homeIso: r.homeIso);
+  final c = p.iso == null ? null : countryByIso(p.iso);
+  if (p.e164 != null && c != null) return '+${c.dial} ${p.national}';
+  return r.phone ?? '';
+}
+
 class _FactGrid extends StatelessWidget {
   const _FactGrid({required this.facts});
-  final List<(String, String)> facts;
+  final List<_Fact> facts;
 
   @override
   Widget build(BuildContext context) {
@@ -325,10 +357,22 @@ class _FactGrid extends StatelessWidget {
         for (final f in facts)
           SizedBox(
             width: w,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(f.$1, style: TextStyle(fontSize: 12, color: c.muted)),
-              Text(f.$2, style: const TextStyle(fontWeight: FontWeight.w500)),
-            ]),
+            child: InkWell(
+              key: Key('fact-${f.label}'),
+              onTap: f.onTap,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(f.label, style: TextStyle(fontSize: 12, color: c.muted)),
+                Row(children: [
+                  Flexible(
+                    child: Text(f.value,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: f.onTap == null ? null : c.accent)),
+                  ),
+                  if (f.onTap != null) Icon(Icons.chevron_right, size: 16, color: c.accent),
+                ]),
+              ]),
+            ),
           ),
       ]);
     });

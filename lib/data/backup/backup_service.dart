@@ -83,6 +83,8 @@ class BackupService {
             'snoozedUntil': _tn(r.snoozedUntil),
             'skippedUntil': _tn(r.skippedUntil),
             'archivedAt': _tn(r.archivedAt),
+            'instagram': r.instagram,
+            'unansweredAt': _tn(r.unansweredAt),
           }, r.createdAt, r.updatedAt, r.deletedAt),
       ],
       'customBlocks': [
@@ -256,6 +258,8 @@ class BackupService {
           snoozedUntil: Value(r['snoozedUntil']),
           skippedUntil: Value(r['skippedUntil']),
           archivedAt: Value(r['archivedAt']),
+          instagram: Value(r['instagram']),
+          unansweredAt: Value(r['unansweredAt']),
           createdAt: Value(r['createdAt']),
           updatedAt: Value(r['updatedAt']),
           deletedAt: Value(r['deletedAt']),

@@ -28,6 +28,7 @@ class RankPerson {
     this.snoozedUntil,
     this.skippedUntil,
     this.lastTalkedEstimate,
+    this.unansweredAt,
     this.chats = const [],
   });
   final String id;
@@ -39,10 +40,15 @@ class RankPerson {
   final DateTime? snoozedUntil;
   final DateTime? skippedUntil;
   final DateTime? lastTalkedEstimate;
+
+  /// When you last tried to reach them and they did not answer.
+  final DateTime? unansweredAt;
   final List<RankChat> chats;
 }
 
-enum PersonStatus { ok, asleep, today, notDue, skipped, snoozed, archived }
+/// [snoozed] is shown to people as Paused. [retryLater] is the few hours after
+/// "Didn't answer".
+enum PersonStatus { ok, asleep, today, notDue, skipped, snoozed, retryLater, archived }
 
 class RankSettings {
   const RankSettings({
@@ -68,6 +74,8 @@ class RankRow {
     required this.sure,
     required this.hasHistory,
     required this.skipEligible,
+    this.boosted = false,
+    this.returnsAt,
   });
   final RankPerson person;
 
@@ -84,6 +92,13 @@ class RankRow {
 
   /// Skipped today but otherwise someone who could be shown.
   final bool skipEligible;
+
+  /// You tried to reach them and they did not answer, and no chat has been
+  /// logged since (fading after a week): they go to the front of the queue.
+  final bool boosted;
+
+  /// When the "Didn't answer" cooldown ends (only while [status] is retryLater).
+  final DateTime? returnsAt;
 
   int get interval => person.intervalDays;
 }
@@ -140,9 +155,21 @@ PersonStatus _status(RankPerson p, DateTime now, RankSettings s, {required bool 
   if (lc != null && calendarDate(s.userZone, lc) == calendarDate(s.userZone, now)) {
     return PersonStatus.today; // same calendar day in your timezone, not 24 hours
   }
+  if (_cooldownEnds(p) != null && now.isBefore(_cooldownEnds(p)!)) return PersonStatus.retryLater;
   final mins = minutesOfDay(p.zone, now);
   if (mins < s.awakeStartMinutes || mins >= s.awakeEndMinutes) return PersonStatus.asleep;
   return PersonStatus.ok;
+}
+
+DateTime? _cooldownEnds(RankPerson p) => p.unansweredAt?.add(const Duration(hours: Tune.unansweredCooldownHours));
+
+/// Tried and not answered, still within the boost window, and no chat since.
+bool _boosted(RankPerson p, DateTime now) {
+  final u = p.unansweredAt;
+  if (u == null) return false;
+  if (now.difference(u) >= const Duration(days: Tune.unansweredBoostDays)) return false;
+  final lc = lastChatAt(p);
+  return lc == null || lc.isBefore(u);
 }
 
 /// Every active person with their status, best first. Order: eligible people
@@ -155,12 +182,15 @@ List<RankRow> rank(List<RankPerson> people, DateTime now, RankSettings s) {
     final days = (now.difference(last).inMilliseconds / _dayMs).clamp(0.0, double.infinity);
     final iv = p.intervalDays <= 0 ? 1 : p.intervalDays;
     final ratio = days / iv;
+    final boosted = _boosted(p, now);
     var st = _status(p, now, s, ignoreSkip: false);
     var base = _status(p, now, s, ignoreSkip: true);
-    if ((st == PersonStatus.ok || st == PersonStatus.asleep) && ratio < Tune.dueFloor) {
+    // A boosted person stays in play even if they are not yet due: you wanted
+    // to talk to them, so the due floor does not apply.
+    if (!boosted && (st == PersonStatus.ok || st == PersonStatus.asleep) && ratio < Tune.dueFloor) {
       st = PersonStatus.notDue;
     }
-    if ((base == PersonStatus.ok || base == PersonStatus.asleep) && ratio < Tune.dueFloor) {
+    if (!boosted && (base == PersonStatus.ok || base == PersonStatus.asleep) && ratio < Tune.dueFloor) {
       base = PersonStatus.notDue;
     }
     final info = expectedInfo(p.chats, ratio);
@@ -174,12 +204,15 @@ List<RankRow> rank(List<RankPerson> people, DateTime now, RankSettings s) {
       sure: info.sure,
       hasHistory: p.chats.isNotEmpty,
       skipEligible: st == PersonStatus.skipped && base == PersonStatus.ok,
+      boosted: boosted,
+      returnsAt: st == PersonStatus.retryLater ? _cooldownEnds(p) : null,
     ));
   }
   rows.sort((a, b) {
     final ao = a.status == PersonStatus.ok ? 0 : 1;
     final bo = b.status == PersonStatus.ok ? 0 : 1;
     if (ao != bo) return ao - bo;
+    if (a.boosted != b.boosted) return a.boosted ? -1 : 1;
     if (b.score != a.score) return b.score.compareTo(a.score);
     if (b.days != a.days) return b.days.compareTo(a.days);
     return a.person.name.toLowerCase().compareTo(b.person.name.toLowerCase());
@@ -231,6 +264,12 @@ HeroPick pickHero(List<RankRow> rows, TimeChip chip) {
     }
   }
   if (pool.isEmpty) return const HeroPick();
+  // Someone you tried and missed goes first, whatever the time preference.
+  final tried = pool.where((r) => r.boosted).toList();
+  if (tried.isNotEmpty) {
+    tried.sort((a, b) => b.score.compareTo(a.score));
+    return HeroPick(row: tried.first, fromSkipped: fromSkipped);
+  }
   RankRow? best;
   var bestScore = -1.0;
   var bestFits = true;
@@ -264,7 +303,9 @@ int wakeInMinutes(RankPerson p, DateTime now, RankSettings s) {
 String whyLine(RankRow r) {
   final over = r.days - r.interval;
   String a;
-  if (over >= 90) {
+  if (r.boosted && over < 1) {
+    a = 'You tried earlier';
+  } else if (over >= 90) {
     a = 'Overdue by ${(over / 30).floor()} months';
   } else if (over >= 14) {
     a = 'Overdue by ${(over / 7).floor()} weeks';
@@ -277,6 +318,7 @@ String whyLine(RankRow r) {
     final d = (-over).ceil();
     a = 'Due in $d ${d == 1 ? 'day' : 'days'}';
   }
+  if (r.boosted && over >= 1) a = 'You tried earlier · $a';
   if (!r.hasHistory) return a;
   final m = r.expectedMinutes;
   final kind = m <= 20 ? 'check-in' : (m <= 45 ? 'catch-up' : 'long chat');

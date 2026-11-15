@@ -1,0 +1,65 @@
+{
+  "format": "lately-backup",
+  "formatVersion": "1.1",
+  "appVersion": "0.3.0",
+  "exportedAt": "2026-11-08T07:15:00Z",
+  "checksum": "sha256:031d926ae59d1a670b9e07cf6c3a7bbe41766d83d60fff89ce1078a799f4de24",
+  "data": {
+    "settings": {
+      "awakeStart": "08:00",
+      "awakeEnd": "22:00",
+      "blockOrder": [
+        "next_time",
+        "family",
+        "interests",
+        "about"
+      ]
+    },
+    "groups": [
+      {
+        "id": "g-001",
+        "name": "Friends",
+        "defaultIntervalDays": 30,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "people": [
+      {
+        "id": "p-ana",
+        "displayName": "Ana",
+        "groupId": "g-001",
+        "timezone": "Europe/Lisbon",
+        "timezoneConfirmed": true,
+        "contactMethod": {
+          "type": "whatsapp",
+          "value": "+351912345678"
+        },
+        "phone": "+351912345678",
+        "instagram": "ana.s",
+        "unansweredAt": "2026-11-10T18:30:00Z",
+        "snoozedUntil": "2026-11-20T00:00:00Z",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-10T18:30:00Z"
+      },
+      {
+        "id": "p-ig",
+        "displayName": "Ig Only",
+        "groupId": "g-001",
+        "timezone": "UTC",
+        "contactMethod": {
+          "type": "instagram",
+          "value": "ig.only"
+        },
+        "instagram": "ig.only",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "chats": [],
+    "lines": [],
+    "familyMembers": [],
+    "importantDates": [],
+    "customBlocks": []
+  }
+}

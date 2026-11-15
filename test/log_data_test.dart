@@ -122,4 +122,48 @@ void main() {
     }
     expect((await repo.linesFor(sam, block: 'interests')).map((l) => l.lineText), ['a', 'b', 'c']);
   });
+
+  test("didn't answer: stamps the time, clears the prompt for them, and is not a chat", () async {
+    await repo.setRecentContact(sam);
+    await repo.didntAnswer(sam);
+    final p = (await repo.getPerson(sam))!;
+    expect(p.unansweredAt!.toUtc(), now);
+    expect(await repo.chatsFor(sam), isEmpty);
+    final s = await repo.getSettings();
+    expect(s.recentContactPersonId, isNull);
+    expect((await repo.lastContactOf(p))!.toUtc(), now.subtract(const Duration(days: 100))); // the estimate is unchanged
+  });
+
+  test("didn't answer leaves someone else's prompt alone, and can be undone", () async {
+    final g = (await repo.listGroups()).first.id;
+    final other = await repo.createPerson(displayName: 'Bo', groupId: g, timezone: 'UTC', contactMethodType: 'text');
+    await repo.setRecentContact(other);
+    await repo.didntAnswer(sam);
+    expect((await repo.getSettings()).recentContactPersonId, other);
+    await repo.restoreUnanswered(sam, null);
+    expect((await repo.getPerson(sam))!.unansweredAt, isNull);
+    final earlier = now.subtract(const Duration(hours: 5));
+    await repo.restoreUnanswered(sam, earlier);
+    expect((await repo.getPerson(sam))!.unansweredAt!.toUtc(), earlier);
+  });
+
+  test('logging a chat clears didn\'t answer', () async {
+    await repo.didntAnswer(sam);
+    await repo.logChat(personId: sam, occurredAt: now, type: 'call', depth: 'deep', durationMinutes: 20);
+    expect((await repo.getPerson(sam))!.unansweredAt, isNull);
+  });
+
+  test('pausing and resuming', () async {
+    final until = now.add(const Duration(days: 9));
+    await repo.snoozeUntil(sam, until);
+    expect((await repo.getPerson(sam))!.snoozedUntil!.toUtc(), until);
+    await repo.clearSnooze(sam);
+    expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
+  });
+
+  test('instagram username is stored with the person', () async {
+    final g = (await repo.listGroups()).first.id;
+    final id = await repo.createPerson(displayName: 'Ana', groupId: g, timezone: 'UTC', contactMethodType: 'instagram', instagram: 'ana.s');
+    expect((await repo.getPerson(id))!.instagram, 'ana.s');
+  });
 }

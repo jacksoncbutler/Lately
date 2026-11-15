@@ -77,6 +77,13 @@ class People extends Table with RecordColumns {
   /// Skip hides a person until this instant (next local midnight).
   DateTimeColumn get skippedUntil => dateTime().nullable()();
   DateTimeColumn get archivedAt => dateTime().nullable()();
+
+  /// Instagram username without the @ (for opening their DM or profile).
+  TextColumn get instagram => text().nullable()();
+
+  /// When you last tried to reach them and they did not answer. Keeps them
+  /// out of Home for a few hours, then boosts them until a chat is logged.
+  DateTimeColumn get unansweredAt => dateTime().nullable()();
 }
 
 /// "Their people": tiles on a profile. Never ranked.

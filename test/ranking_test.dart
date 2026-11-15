@@ -19,6 +19,7 @@ RankPerson person(
   DateTime? estimate,
   DateTime? snoozedUntil,
   DateTime? skippedUntil,
+  DateTime? unansweredAt,
   bool archived = false,
   double weight = 1.0,
 }) =>
@@ -31,6 +32,7 @@ RankPerson person(
       lastTalkedEstimate: estimate,
       snoozedUntil: snoozedUntil,
       skippedUntil: skippedUntil,
+      unansweredAt: unansweredAt,
       archived: archived,
       weight: weight,
     );
@@ -461,6 +463,117 @@ void main() {
 
     test('with no chat history the second half is dropped', () {
       expect(whyLine(row(days: 60, chats: [])), 'Overdue by 4 weeks');
+    });
+  });
+
+  group("didn't answer: out for three hours, then to the front until a chat", () {
+    DateTime ago(Duration d) => now.subtract(d);
+
+    test('for three hours they are out of the mix, then eligible again', () {
+      final p = person('P', chats: [chat(40)], unansweredAt: ago(const Duration(minutes: 5)));
+      final r = rank([p], now, utc).single;
+      expect(r.status, PersonStatus.retryLater);
+      expect(r.returnsAt, now.add(const Duration(hours: 2, minutes: 55)));
+      expect(pickHero([r], TimeChip.any).row, isNull);
+
+      final back = rank([p], now.add(const Duration(hours: 3)), utc).single;
+      expect(back.status, PersonStatus.ok);
+      expect(back.returnsAt, isNull);
+      final justBefore = rank([p], now.add(const Duration(hours: 2, minutes: 54)), utc).single;
+      expect(justBefore.status, PersonStatus.retryLater);
+    });
+
+    test('after the cooldown they go to the front even if someone else is more overdue', () {
+      final tried = person('Tried', chats: [chat(40)], unansweredAt: ago(const Duration(hours: 4)));
+      final far = person('Far', chats: [chat(150)]);
+      final rows = rank([far, tried], now, utc);
+      expect(rows.first.person.name, 'Tried');
+      expect(rows.first.boosted, isTrue);
+      expect(pickHero(rows, TimeChip.any).row!.person.name, 'Tried');
+    });
+
+    test('they stay in play even when they were not yet due', () {
+      final p = person('P', chats: [chat(5)], unansweredAt: ago(const Duration(hours: 4))); // ratio .17
+      expect(rank([p], now, utc).single.status, PersonStatus.ok);
+      final plain = person('Q', chats: [chat(5)]);
+      expect(rank([plain], now, utc).single.status, PersonStatus.notDue);
+    });
+
+    test('the time preference does not push them down', () {
+      final tried = person('Tried', chats: [chat(40, minutes: 90, length: 'long')], unansweredAt: ago(const Duration(hours: 4)));
+      final short = person('Short', chats: [chat(45, minutes: 10, length: 'quick')]);
+      final rows = rank([short, tried], now, utc);
+      for (final c in TimeChip.values) {
+        expect(pickHero(rows, c).row!.person.name, 'Tried', reason: '$c');
+      }
+    });
+
+    test('the boost fades after a week', () {
+      final p = person('P', chats: [chat(40)], unansweredAt: ago(const Duration(days: 6, hours: 23)));
+      expect(rank([p], now, utc).single.boosted, isTrue);
+      final faded = person('P', chats: [chat(40)], unansweredAt: ago(const Duration(days: 7, minutes: 1)));
+      expect(rank([faded], now, utc).single.boosted, isFalse);
+      final other = person('O', chats: [chat(100)]);
+      expect(rank([faded, other], now, utc).first.person.name, 'O'); // normal order again
+    });
+
+    test('a chat logged since clears the boost (and does not count before it)', () {
+      final tried = ago(const Duration(hours: 5));
+      final spoke = person('P', unansweredAt: tried, chats: [
+        RankChat(at: now.subtract(const Duration(hours: 1)), length: 'quick'), // after trying
+        chat(40),
+      ]);
+      expect(rank([spoke], now, utc).single.boosted, isFalse);
+      final before = person('P', unansweredAt: tried, chats: [chat(40)]); // the old chat is from before
+      expect(rank([before], now, utc).single.boosted, isTrue);
+    });
+
+    test('it is not contact: the days since you talked do not change', () {
+      final p = person('P', chats: [chat(40)], unansweredAt: ago(const Duration(minutes: 5)));
+      expect(rank([p], now, utc).single.days, closeTo(40, 0.01));
+    });
+
+    test('they still must be awake, and are still skipped by Not today', () {
+      final asleep = person('A', zone: 'Asia/Tokyo', chats: [chat(40)], unansweredAt: ago(const Duration(hours: 4)));
+      expect(rank([asleep], now, utc).single.status, PersonStatus.asleep);
+      final skipped = person('S', chats: [chat(40)], unansweredAt: ago(const Duration(hours: 4)), skippedUntil: nextLocalMidnight('UTC', now));
+      expect(rank([skipped], now, utc).single.status, PersonStatus.skipped);
+    });
+
+    test('someone you talked to today is today, whatever else', () {
+      final p = person('P', chats: [chat(0)], unansweredAt: ago(const Duration(hours: 4)));
+      expect(rank([p], now, utc).single.status, PersonStatus.today);
+    });
+
+    test('a paused person stays paused', () {
+      final p = person('P', chats: [chat(40)], unansweredAt: ago(const Duration(hours: 4)), snoozedUntil: now.add(const Duration(days: 3)));
+      expect(rank([p], now, utc).single.status, PersonStatus.snoozed);
+    });
+
+    test('with several tried, the most overdue goes first', () {
+      final a = person('A', chats: [chat(40)], unansweredAt: ago(const Duration(hours: 4)));
+      final b = person('B', chats: [chat(90)], unansweredAt: ago(const Duration(hours: 9)));
+      expect(pickHero(rank([a, b], now, utc), TimeChip.any).row!.person.name, 'B');
+    });
+
+    test('the why line says you tried, with no counts', () {
+      final overdue = person('P', chats: [chat(40)], unansweredAt: ago(const Duration(hours: 4)));
+      final w = whyLine(rank([overdue], now, utc).single);
+      expect(w.startsWith('You tried earlier · Overdue by'), isTrue);
+      final early = person('Q', chats: [chat(5)], unansweredAt: ago(const Duration(hours: 4)));
+      final w2 = whyLine(rank([early], now, utc).single);
+      expect(w2.startsWith('You tried earlier · '), isTrue);
+      expect(w2.contains('Due in'), isFalse); // not contradicting "due in N days"
+      expect(RegExp(r'\d+ (times|attempts)').hasMatch('$w $w2'), isFalse);
+    });
+
+    test('Not today works on a boosted person: they come back at midnight, still boosted', () {
+      final until = nextLocalMidnight('UTC', now);
+      final p = person('P', chats: [chat(40)], unansweredAt: ago(const Duration(hours: 4)), skippedUntil: until);
+      final tomorrow = DateTime.utc(2026, 11, 12, 9);
+      final r = rank([p], tomorrow, utc).single;
+      expect(r.status, PersonStatus.ok);
+      expect(r.boosted, isTrue);
     });
   });
 
