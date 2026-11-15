@@ -400,6 +400,24 @@ void main() {
       expect(heroName('Sam'), findsOneWidget);
     });
 
+    testApp("the Undo bar for Didn't answer and Not today also goes after three seconds", (tester) async {
+      await add('Sam', daysAgo: 60);
+      await add('Bo', daysAgo: 40);
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('hero-no-answer')));
+      await settle(tester);
+      expect(find.text('Undo'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+      await tester.tap(find.byKey(const Key('hero-skip')));
+      await settle(tester);
+      expect(find.text('Undo'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+    });
+
     testApp('they come back after three hours, not before', (tester) async {
       await add('Sam', daysAgo: 60);
       await add('Bo', daysAgo: 40);

@@ -9,6 +9,7 @@ import '../../data/repository.dart';
 import '../../domain/phone.dart';
 import '../../domain/profile_format.dart';
 import '../../domain/reach.dart';
+import '../../domain/social.dart';
 import '../../domain/timezones.dart';
 import '../../ui/theme.dart';
 import 'edit_person_sheet.dart';
@@ -73,15 +74,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final reach = Reach(person);
     final hasContact = reach.canContact;
     final paused = person.snoozedUntil != null && person.snoozedUntil!.isAfter(now());
-    final socials = () {
-      if (person.socials == null) return null;
-      try {
-        return (jsonDecode(person.socials!) as List).join(', ');
-      } catch (_) {
-        return null;
-      }
-    }();
-
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -202,15 +194,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       child: _FactGrid(facts: [
                         _Fact('Number', reach.phone == null ? 'Not added' : _numberText(reach),
                             onTap: reach.phone == null ? null : () => showNumberOptions(context, person)),
+                        // Their accounts open straight to their profile; Contact
+                        // is what opens a DM.
                         _Fact('Instagram',
                             instagramUsername(reach.instagram) == null
                                 ? 'Not added'
                                 : '@${instagramUsername(reach.instagram)}',
                             onTap: instagramUsername(reach.instagram) == null
                                 ? null
-                                : () => showInstagramOptions(context, person)),
+                                : () => openProfileLink(context, ref, person, Channel.instagram)),
+                        _Fact('Facebook', facebookToken(reach.facebook) ?? 'Not added',
+                            onTap: facebookToken(reach.facebook) == null
+                                ? null
+                                : () => openProfileLink(context, ref, person, Channel.facebook)),
                         _Fact('Hometown', person.hometown ?? 'Not added'),
-                        _Fact('Other socials', socials ?? 'Not added'),
                       ]),
                     ),
                   const Divider(),

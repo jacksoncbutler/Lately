@@ -282,4 +282,28 @@ void main() {
     'importantDates': [],
     'customBlocks': [],
   });
+
+  // 1.2: a Facebook username, with Facebook (Messenger) as the contact.
+  write('backup_v1_2_facebook.json', '1.2', {
+    'settings': settings(),
+    'groups': [group('g-001', 'Friends', 30)],
+    'people': [
+      {
+        'id': 'p-fb',
+        'displayName': 'Fb Friend',
+        'groupId': 'g-001',
+        'timezone': 'Europe/Lisbon',
+        'contactMethod': {'type': 'facebook', 'value': 'fb.friend'},
+        'facebook': 'fb.friend',
+        'instagram': 'fb.friend.ig',
+        'createdAt': t0,
+        'updatedAt': t0,
+      }
+    ],
+    'chats': [],
+    'lines': [],
+    'familyMembers': [],
+    'importantDates': [],
+    'customBlocks': [],
+  });
 }

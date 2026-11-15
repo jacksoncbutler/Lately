@@ -7,6 +7,7 @@ void main() {
     expect(channelOf('call'), Channel.call);
     expect(channelOf('whatsapp'), Channel.whatsapp);
     expect(channelOf('instagram'), Channel.instagram);
+    expect(channelOf('facebook'), Channel.facebook);
     expect(channelOf(null), Channel.text);
     expect(channelOf('signal'), Channel.text); // a newer app's value falls back
     for (final c in Channel.values) {
@@ -15,7 +16,7 @@ void main() {
   });
 
   test('labels', () {
-    expect([for (final c in Channel.values) channelLabel(c)], ['Text', 'Call', 'WhatsApp', 'Instagram']);
+    expect([for (final c in Channel.values) channelLabel(c)], ['Text', 'Call', 'WhatsApp', 'Instagram', 'Facebook']);
   });
 
   group('what each channel needs', () {
@@ -41,7 +42,22 @@ void main() {
       expect(canReach(Channel.instagram, phone: '+351912345678'), isFalse);
     });
 
+    test('Facebook needs a username, id or link', () {
+      expect(canReach(Channel.facebook, facebook: 'sam.rodrigues'), isTrue);
+      expect(canReach(Channel.facebook, facebook: 'https://facebook.com/sam.rodrigues'), isTrue);
+      expect(canReach(Channel.facebook, facebook: '100012345678901'), isTrue);
+      expect(canReach(Channel.facebook, facebook: 'no'), isFalse);
+      expect(canReach(Channel.facebook, instagram: 'sam.r'), isFalse);
+    });
+
+    test('what Contact opens', () {
+      expect(channelTarget(Channel.facebook), 'Facebook Messenger');
+      expect(channelTarget(Channel.instagram), 'an Instagram DM');
+      expect(channelTarget(Channel.whatsapp), 'WhatsApp');
+    });
+
     test('what is missing, in words', () {
+      expect(missingFor(Channel.facebook), 'Add their Facebook profile to reach them.');
       expect(missingFor(Channel.instagram), 'Add their Instagram username to reach them.');
       expect(missingFor(Channel.whatsapp), 'Add a number to reach them.');
       expect(missingFor(Channel.text), 'Add a number to reach them.');

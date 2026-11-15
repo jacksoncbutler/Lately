@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/constants.dart';
+import '../domain/social.dart';
 import 'tables.dart';
 
 part 'database.g.dart';
@@ -29,7 +30,7 @@ class LatelyDatabase extends _$LatelyDatabase {
 
   /// Bump with every table change and add a step in [onUpgrade]. The database
   /// file is copied aside before migrating (see lib/data/safe_open.dart).
-  static const currentSchemaVersion = 4;
+  static const currentSchemaVersion = 5;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -61,6 +62,24 @@ class LatelyDatabase extends _$LatelyDatabase {
             await m.addColumn(people, people.unansweredAt);
             await (update(settings)..where((t) => t.id.equals(settingsId)))
                 .write(const SettingsCompanion(schemaVersion: Value(4)));
+          }
+          if (from < 5) {
+            await m.addColumn(people, people.facebook);
+            // The free-text socials field is gone from the app. Keep what it
+            // held where it can be recognised: an @name or instagram.com link
+            // becomes Instagram, a facebook.com link becomes Facebook. The old
+            // text itself is left in the data (and in backups).
+            for (final r in await select(people).get()) {
+              final h = migrateSocials(r.socials);
+              final ig = r.instagram ?? h.instagram;
+              final fb = r.facebook ?? h.facebook;
+              if (ig != r.instagram || fb != r.facebook) {
+                await (update(people)..where((t) => t.id.equals(r.id))).write(
+                    PeopleCompanion(instagram: Value(ig), facebook: Value(fb)));
+              }
+            }
+            await (update(settings)..where((t) => t.id.equals(settingsId)))
+                .write(const SettingsCompanion(schemaVersion: Value(5)));
           }
         },
         beforeOpen: (details) async {

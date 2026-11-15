@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../data/providers.dart';
-import '../../domain/phone.dart';
 import '../../domain/reach.dart';
 import 'contact_action.dart';
 
@@ -19,32 +18,17 @@ Future<void> showNumberOptions(BuildContext context, PersonRow person) =>
       ),
     );
 
-/// Tap their Instagram: open a DM or their profile.
-Future<void> showInstagramOptions(BuildContext context, PersonRow person) =>
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (_) => _OptionsSheet(
-        person: person,
-        title: 'Instagram',
-        subtitle: '@${instagramUsername(Reach(person).instagram) ?? ''}',
-        options: const [Channel.instagram],
-        instagram: true,
-      ),
-    );
-
 class _OptionsSheet extends ConsumerWidget {
   const _OptionsSheet({
     required this.person,
     required this.title,
     required this.subtitle,
     required this.options,
-    this.instagram = false,
   });
   final PersonRow person;
   final String title;
   final String subtitle;
   final List<Channel> options;
-  final bool instagram;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -71,21 +55,7 @@ class _OptionsSheet extends ConsumerWidget {
           Text(title, style: t.titleLarge),
           if (subtitle.isNotEmpty) Text(subtitle, style: t.bodyMedium),
           const SizedBox(height: 16),
-          if (instagram) ...[
-            FilledButton(
-              key: const Key('ig-dm'),
-              onPressed: () => go(Channel.instagram),
-              child: const Text('Open DM'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              key: const Key('ig-profile'),
-              onPressed: () => go(Channel.instagram, dm: false, counts: false),
-              child: const Text('Open profile'),
-            ),
-            const SizedBox(height: 12),
-            Text('Opens in the Instagram app.', style: t.bodySmall),
-          ] else ...[
+          ...[
             Row(children: [
               for (final c in options) ...[
                 Expanded(

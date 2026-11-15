@@ -65,3 +65,9 @@ CI and release builds pin Flutter 3.47.9 (`flutter-version` in `.github/workflow
 - "Didn't answer": `Repository.didntAnswer`, `PersonStatus.retryLater`, `RankRow.boosted`; constants `unansweredCooldownHours` (3) and `unansweredBoostDays` (7).
 - The repository now takes its clock from `nowProvider`, so tests that override the clock control what the repository writes too.
 - The log popup pads for the keyboard and hides its Save bar while the keyboard is up. Widget tests use a phone-sized screen to prove it (`test/log_flow_test.dart`).
+
+## Version 0.10 notes
+
+- `lib/data/phone_launcher.dart` now sits on an `AppOpener` (explicit-app intents on Android through android_intent_plus, else a link), so the order of steps (for example the Instagram start-then-DM sequence) is tested without a phone (`test/launcher_test.dart`). The Instagram warm-up delay is `instagramWarmup` (1.5 s): tune it, or remove the warm-up, if the DM opens reliably without it.
+- `lib/domain/social.dart`: Facebook username, id and link parsing, the open-profile and Messenger links, and `migrateSocials` (used once by the schema 5 upgrade).
+- `showUndoBar` sets `persist: false` and a 3 second duration. Do not remove `persist: false`: without it Flutter keeps a snack bar that has an action on screen indefinitely.

@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import '../../data/providers.dart';
 import '../../domain/phone.dart';
 import '../../domain/profile_format.dart';
 import '../../domain/reach.dart';
+import '../../domain/social.dart';
 import '../../ui/birthday_picker.dart';
 import '../../ui/city_picker.dart';
 import '../../ui/phone_field.dart';
@@ -44,24 +44,15 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
   late final _interval = TextEditingController(
       text: widget.person.intervalOverrideDays?.toString() ?? '');
   late final _hometown = TextEditingController(text: widget.person.hometown ?? '');
-  late final _socials = TextEditingController(text: _socialsText(widget.person.socials));
+  late final _facebook = TextEditingController(text: _reach.facebook ?? '');
   late String _groupId = widget.person.groupId;
   late String? _zone = widget.person.timezoneConfirmed ? widget.person.timezone : null;
   late String? _birthday = widget.person.birthday;
   bool _confirmDelete = false;
 
-  static String _socialsText(String? json) {
-    if (json == null) return '';
-    try {
-      return (jsonDecode(json) as List).cast<String>().join(', ');
-    } catch (_) {
-      return '';
-    }
-  }
-
   @override
   void dispose() {
-    for (final c in [_name, _instagram, _interval, _hometown, _socials]) {
+    for (final c in [_name, _instagram, _facebook, _interval, _hometown]) {
       c.dispose();
     }
     super.dispose();
@@ -93,7 +84,7 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
   Future<void> _save() async {
     final phone = _phone.stored;
     final ig = instagramUsername(_instagram.text);
-    final socials = _socials.text.trim();
+    final fb = facebookToken(_facebook.text);
     await ref.read(repositoryProvider).updatePerson(
           widget.person.id,
           PeopleCompanion(
@@ -101,15 +92,15 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
             groupId: Value(_groupId),
             contactMethodType: Value(channelType(_channel)),
             // The value mirrors what the preferred channel uses (older readers).
-            contactMethodValue: Value(_channel == Channel.instagram ? ig : phone),
+            contactMethodValue: Value(_channel == Channel.instagram ? ig : (_channel == Channel.facebook ? fb : phone)),
             phone: Value(phone),
             instagram: Value(ig),
+            facebook: Value(fb),
             timezone: Value(_zone ?? widget.person.timezone),
             timezoneConfirmed: Value(_zone != null),
             birthday: Value(_birthday),
             intervalOverrideDays: Value(int.tryParse(_interval.text.trim())),
             hometown: Value(_hometown.text.trim().isEmpty ? null : _hometown.text.trim()),
-            socials: Value(socials.isEmpty ? null : jsonEncode([socials])),
           ),
         );
     if (mounted) Navigator.pop(context, EditOutcome.saved);
@@ -153,6 +144,19 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
                 textCapitalization: TextCapitalization.words,
                 onChanged: (_) => setState(() {}),
               ),
+              const SizedBox(height: 8),
+              TextField(
+                key: const Key('edit-facebook'),
+                controller: _facebook,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: 'Facebook (username or link)',
+                  errorText: _facebook.text.trim().isEmpty || facebookToken(_facebook.text) != null
+                      ? null
+                      : "That doesn't look like a Facebook profile",
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
               label('Group'),
               Wrap(spacing: 8, runSpacing: 4, children: [
                 for (final g in groups)
@@ -173,7 +177,7 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
                   ),
               ]),
               const SizedBox(height: 8),
-              Text('Contact opens straight to ${channelLabel(_channel)}.', style: t.bodySmall),
+              Text('Contact opens straight to ${channelTarget(_channel)}.', style: t.bodySmall),
               const SizedBox(height: 8),
               PhoneField(
                 key: const Key('edit-phone'),
@@ -226,8 +230,6 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
               ),
               label('Hometown'),
               TextField(key: const Key('edit-hometown'), controller: _hometown),
-              label('Other socials'),
-              TextField(key: const Key('edit-socials'), controller: _socials),
               const SizedBox(height: 22),
               const Divider(),
               label('Manage'),
@@ -336,7 +338,8 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
             width: double.infinity,
             child: FilledButton(
               onPressed: _name.text.trim().isEmpty ||
-                      (_instagram.text.trim().isNotEmpty && instagramUsername(_instagram.text) == null)
+                      (_instagram.text.trim().isNotEmpty && instagramUsername(_instagram.text) == null) ||
+                      (_facebook.text.trim().isNotEmpty && facebookToken(_facebook.text) == null)
                   ? null
                   : _save,
               child: const Text('Save changes'),

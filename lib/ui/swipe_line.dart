@@ -171,6 +171,8 @@ void showUndoBar(BuildContext context, String message, VoidCallback onUndo) {
   m.showSnackBar(SnackBar(
     content: Text(message),
     action: SnackBarAction(label: 'Undo', onPressed: onUndo),
-    duration: const Duration(seconds: 5),
+    // A snack bar with an action stays up until dismissed unless told not to.
+    persist: false,
+    duration: const Duration(seconds: 3),
   ));
 }

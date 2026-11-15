@@ -81,6 +81,9 @@ class People extends Table with RecordColumns {
   /// Instagram username without the @ (for opening their DM or profile).
   TextColumn get instagram => text().nullable()();
 
+  /// Facebook username or numeric id (for their profile and Messenger).
+  TextColumn get facebook => text().nullable()();
+
   /// When you last tried to reach them and they did not answer. Keeps them
   /// out of Home for a few hours, then boosts them until a chat is logged.
   DateTimeColumn get unansweredAt => dateTime().nullable()();

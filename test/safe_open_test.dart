@@ -27,8 +27,11 @@ void main() {
     final g = (await repo.listGroups()).first.id;
     await repo.createPerson(
         displayName: 'Sam', groupId: g, timezone: 'UTC', contactMethodType: 'text');
-    await db.customStatement('ALTER TABLE people DROP COLUMN instagram');
-    await db.customStatement('ALTER TABLE people DROP COLUMN unanswered_at');
+    await db.customStatement('ALTER TABLE people DROP COLUMN facebook');
+    if (version < 4) {
+      await db.customStatement('ALTER TABLE people DROP COLUMN instagram');
+      await db.customStatement('ALTER TABLE people DROP COLUMN unanswered_at');
+    }
     if (version < 3) {
       await db.customStatement('ALTER TABLE settings DROP COLUMN setup_completed_at');
     }
@@ -54,7 +57,7 @@ void main() {
     final repo = Repository(db);
     expect((await repo.listPeople()).single.displayName, 'Sam');
     expect((await repo.getSettings()).lastExportAt, isNull); // column exists again
-    final copies = snaps.listSync().map((e) => e.path).where((p) => p.contains('pre-migration-v1-to-v4'));
+    final copies = snaps.listSync().map((e) => e.path).where((p) => p.contains('pre-migration-v1-to-v5'));
     expect(copies, hasLength(1));
     expect(await repo.isSetupComplete(), isTrue); // Sam exists
     await db.close();
@@ -66,12 +69,13 @@ void main() {
     final repo = Repository(db);
     expect((await repo.listPeople()).single.displayName, 'Sam');
     expect(await repo.isSetupComplete(), isTrue);
-    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v2-to-v4')), hasLength(1));
+    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v2-to-v5')), hasLength(1));
     await db.close();
   });
 
   test('upgrade from 0.2.0 with no people leaves setup to do', () async {
     final db0 = LatelyDatabase(NativeDatabase(dbFile));
+    await db0.customStatement('ALTER TABLE people DROP COLUMN facebook');
     await db0.customStatement('ALTER TABLE people DROP COLUMN instagram');
     await db0.customStatement('ALTER TABLE people DROP COLUMN unanswered_at');
     await db0.customStatement('ALTER TABLE settings DROP COLUMN setup_completed_at');
@@ -93,7 +97,38 @@ void main() {
     expect(sam.unansweredAt, isNull);
     await repo.updatePerson(sam.id, const PeopleCompanion(instagram: Value('sam.r')));
     expect((await repo.getPerson(sam.id))!.instagram, 'sam.r');
-    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v3-to-v4')), hasLength(1));
+    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v3-to-v5')), hasLength(1));
+    await db.close();
+  });
+
+  test('upgrade from 0.9.0 data (schema 4): facebook is added, and recognisable socials move over', () async {
+    await makeOldFile(version: 4);
+    // What an older version kept in the one free-text field.
+    final raw = LatelyDatabase(NativeDatabase(dbFile));
+    await raw.customStatement('ALTER TABLE people DROP COLUMN facebook');
+    await raw.customStatement("UPDATE people SET socials = '[\"@sam.r, https://www.facebook.com/sam.rodrigues\"]'");
+    await raw.customStatement('PRAGMA user_version = 4');
+    await raw.close();
+    final db = await openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain());
+    final sam = (await Repository(db).listPeople()).single;
+    expect(sam.instagram, 'sam.r');
+    expect(sam.facebook, 'sam.rodrigues');
+    expect(sam.socials, contains('@sam.r')); // the old text is kept in the data
+    expect(snaps.listSync().where((e) => e.path.contains('pre-migration-v4-to-v5')), hasLength(1));
+    await db.close();
+  });
+
+  test('socials that cannot be recognised are left alone and nothing is overwritten', () async {
+    await makeOldFile(version: 4);
+    final raw = LatelyDatabase(NativeDatabase(dbFile));
+    await raw.customStatement('ALTER TABLE people DROP COLUMN facebook');
+    await raw.customStatement("UPDATE people SET socials = '[\"tiktok: samr\"]', instagram = 'already.set'");
+    await raw.customStatement('PRAGMA user_version = 4');
+    await raw.close();
+    final db = await openDatabaseSafely(dbFile: dbFile, snapshotDir: snaps, connect: plain());
+    final sam = (await Repository(db).listPeople()).single;
+    expect(sam.instagram, 'already.set');
+    expect(sam.facebook, isNull);
     await db.close();
   });
 

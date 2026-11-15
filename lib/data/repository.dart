@@ -98,6 +98,7 @@ class Repository {
     bool timezoneConfirmed = false,
     String? phone,
     String? instagram,
+    String? facebook,
   }) async {
     final id = newId();
     final t = _now;
@@ -112,6 +113,7 @@ class Repository {
         contactMethodValue: Value(contactMethodValue),
         phone: Value(phone),
         instagram: Value(instagram),
+        facebook: Value(facebook),
         lastTalkedEstimate: Value(lastTalkedEstimate?.toUtc()),
         timezoneConfirmed: Value(timezoneConfirmed)));
     return id;

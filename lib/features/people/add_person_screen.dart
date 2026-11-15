@@ -5,6 +5,7 @@ import '../../data/providers.dart';
 import '../../domain/constants.dart';
 import '../../domain/phone.dart';
 import '../../domain/reach.dart';
+import '../../domain/social.dart';
 import '../../ui/city_picker.dart';
 import '../../ui/phone_field.dart';
 
@@ -20,6 +21,7 @@ class AddPersonScreen extends ConsumerStatefulWidget {
 class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
   final _name = TextEditingController();
   final _instagram = TextEditingController();
+  final _facebook = TextEditingController();
   PhoneValue _phone = PhoneValue(PhoneParse(raw: ''));
   int _formGen = 0; // bumps to clear the number box between people
   String? _groupId;
@@ -41,6 +43,7 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
   void dispose() {
     _name.dispose();
     _instagram.dispose();
+    _facebook.dispose();
     super.dispose();
   }
 
@@ -53,15 +56,17 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
     final days = _lastTalkedDays ?? Tune.defaultLastTalkedDays;
     final phone = _phone.stored;
     final ig = instagramUsername(_instagram.text);
+    final fb = facebookToken(_facebook.text);
     await repo.createPerson(
       displayName: _name.text.trim(),
       groupId: _groupId!,
       timezone: _zone!,
       timezoneConfirmed: true,
       contactMethodType: channelType(_channel),
-      contactMethodValue: _channel == Channel.instagram ? ig : phone,
+      contactMethodValue: _channel == Channel.instagram ? ig : (_channel == Channel.facebook ? fb : phone),
       phone: phone,
       instagram: ig,
+      facebook: fb,
       lastTalkedEstimate: now.subtract(Duration(days: days)),
     );
     ref.invalidate(peopleProvider);
@@ -71,6 +76,7 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
       setState(() {
         _name.clear();
         _instagram.clear();
+        _facebook.clear();
         _phone = PhoneValue(PhoneParse(raw: ''));
         _formGen++;
         _channel = Channel.text;
@@ -142,6 +148,15 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
               controller: _instagram,
               autocorrect: false,
               decoration: const InputDecoration(labelText: 'Instagram username', prefixText: '@'),
+            ),
+          ],
+          if (_channel == Channel.facebook) ...[
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('add-facebook'),
+              controller: _facebook,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Facebook (username or link)'),
             ),
           ],
           const SizedBox(height: 16),

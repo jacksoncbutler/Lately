@@ -75,6 +75,7 @@ const _fields = <String, List<_F>>{
     _F('skippedUntil', _K.inst),
     _F('archivedAt', _K.inst),
     _F('instagram', _K.str),
+    _F('facebook', _K.str),
     _F('unansweredAt', _K.inst),
   ],
   'chats': [

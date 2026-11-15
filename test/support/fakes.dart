@@ -21,4 +21,8 @@ class FakeLauncher implements PhoneLauncher {
   Future<bool> instagramDm(String username) => _rec('ig-dm:$username');
   @override
   Future<bool> instagramProfile(String username) => _rec('ig-profile:$username');
+  @override
+  Future<bool> messenger(String token) => _rec('messenger:$token');
+  @override
+  Future<bool> facebookProfile(String token) => _rec('facebook:$token');
 }

@@ -48,6 +48,7 @@ void main() {
     'backup_v1_0_minimal.json',
     'backup_v1_0_full.json',
     'backup_v1_1_channels.json',
+    'backup_v1_2_facebook.json',
     'backup_v1_7_unknown_fields.json',
   ];
 
@@ -89,7 +90,7 @@ void main() {
     expect((ig.contactMethodType, ig.contactMethodValue, ig.instagram), ('instagram', 'ig.only', 'ig.only'));
     // And they survive a round trip.
     final out = jsonDecode(await svc.exportToString()) as Map;
-    expect(out['formatVersion'], '1.1');
+    expect(out['formatVersion'], AppConfig.backupFormatVersion);
     final people = <String, Map>{
       for (final p in ((out['data'] as Map)['people'] as List).cast<Map>()) p['id'] as String: p,
     };
@@ -97,6 +98,15 @@ void main() {
     expect(ana2['instagram'], 'ana.s');
     expect(ana2['unansweredAt'], '2026-11-10T18:30:00.000Z');
     expect((ana2['contactMethod'] as Map)['type'], 'whatsapp');
+  });
+
+  test('a 1.2 file keeps the Facebook username and Messenger as the contact', () async {
+    await svc.importBackup(parseBackup(fixture('backup_v1_2_facebook.json')), ImportMode.replace);
+    final p = (await repo.getPerson('p-fb'))!;
+    expect((p.contactMethodType, p.contactMethodValue, p.facebook, p.instagram), ('facebook', 'fb.friend', 'fb.friend', 'fb.friend.ig'));
+    final out = jsonDecode(await svc.exportToString()) as Map;
+    final people = ((out['data'] as Map)['people'] as List).cast<Map>();
+    expect(people.single['facebook'], 'fb.friend');
   });
 
   test('older 1.0 files still import, and gain nothing they did not have', () async {

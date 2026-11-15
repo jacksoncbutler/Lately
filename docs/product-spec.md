@@ -30,7 +30,7 @@ These are settled unless marked otherwise; anything unsettled is under Open ques
 
 **Person profile**
 
-- Fixed top zone: name, contact actions, birthday, interval, last in person, last call or text, preferred channel, timezone. An expanded view holds less-used details such as hometown and socials.
+- Fixed top zone: name, contact actions, birthday, interval, last in person, last call or text, preferred channel, timezone. An expanded view holds less-used details such as hometown, their number, and their Instagram and Facebook (tap either to open their profile).
 - Below it, a scrollable grid of blocks, two columns where content is short. Next time is always full width and first.
 - Blocks planned: Next time, Their people, Interests and hobbies, About, plus room for custom blocks. Each block shows its most recent few lines with an expand option.
 - Empty blocks keep the normal size, with faint ruled lines as blank rows and the usual small plus. Block order has a default chosen during setup.
@@ -98,7 +98,7 @@ Version 1 is the smallest app that does the core loop: add people, see who to ta
 
 **4. Person profile**
 
-- Top zone with Contact and Log actions, key facts, and details that expand. An Edit button opens every detail (name, group, how you reach them, timezone, birthday, contact interval, hometown, socials). Archive and Delete forever sit at the bottom of that sheet: archived people are hidden from Home and People but kept, and Delete forever is offered only for archived people and asks for confirmation.
+- Top zone with Contact and Log actions, key facts, and details that expand. An Edit button opens every detail (name, group, how you reach them, timezone, birthday, contact interval, hometown, Instagram, Facebook). Archive and Delete forever sit at the bottom of that sheet: archived people are hidden from Home and People but kept, and Delete forever is offered only for archived people and asks for confirmation.
 - Blocks: Next time (checkboxes), Their people, Interests, About. Add a short line with the plus, tap a line to edit it, swipe left to delete it (with an Undo bar).
 - Empty blocks keep the normal size with ruled blank rows; long blocks show the latest few lines and expand.
 - Their people tiles open a small card with name, relation, birthday, and their own notes.

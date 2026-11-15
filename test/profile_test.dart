@@ -116,7 +116,7 @@ void main() {
 
   group('header and facts', () {
     testApp('shows who they are, where, and the key facts', (tester) async {
-      await repo.updatePerson(sam, const PeopleCompanion(birthday: Value('--03-14'), hometown: Value('Porto'), socials: Value('["@sam.r"]')));
+      await repo.updatePerson(sam, const PeopleCompanion(birthday: Value('--03-14'), hometown: Value('Porto'), socials: Value('["@old.handle"]')));
       await repo.createChat(personId: sam, occurredAt: DateTime.utc(2026, 7, 30, 12), type: 'person', depth: 'deep', length: 'long');
       await repo.createChat(personId: sam, occurredAt: DateTime.utc(2026, 9, 21, 12), type: 'call', depth: 'varied', length: 'catchup', durationMinutes: 30, feelings: ['happy'], note: 'Caught up on the move');
       await repo.createChat(personId: sam, occurredAt: DateTime.utc(2026, 9, 2, 12), type: 'text', depth: 'shallow', length: 'quick');
@@ -137,7 +137,8 @@ void main() {
       await tester.tap(find.byKey(const Key('profile-more')));
       await tester.pumpAndSettle();
       expect(find.text('Porto'), findsOneWidget);
-      expect(find.text('@sam.r'), findsOneWidget); // other socials
+      expect(find.text('@old.handle'), findsNothing); // the old free-text socials are no longer shown
+      expect(find.text('Other socials'), findsNothing);
       expect(find.descendant(of: find.byKey(const Key('fact-Number')), matching: find.textContaining('+351')), findsOneWidget);
       expect(find.text('Fewer details'), findsOneWidget);
     });
@@ -267,6 +268,36 @@ void main() {
       await tester.tap(find.text('Undo'));
       await settle(tester);
       expect(find.text('Swipe me'), findsOneWidget);
+    });
+
+    testApp('the Undo bar goes away by itself after three seconds', (tester) async {
+      await addNextTime('Swipe me');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam)).single.id;
+      await tester.drag(find.byKey(Key('dismiss-$id')), const Offset(-500, 0));
+      await settle(tester);
+      expect(find.text('Undo'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('Undo'), findsOneWidget); // not yet
+      await tester.pump(const Duration(seconds: 2)); // past the three seconds
+      await tester.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+      expect(await repo.linesFor(sam), isEmpty); // and the delete stands
+    });
+
+    testApp('a newer message replaces the Undo bar instead of queueing behind it', (tester) async {
+      await addNextTime('One');
+      await addNextTime('Two');
+      await openProfile(tester);
+      final lines = await repo.linesFor(sam);
+      await tester.drag(find.byKey(Key('dismiss-${lines[0].id}')), const Offset(-500, 0));
+      await settle(tester);
+      await tester.drag(find.byKey(Key('dismiss-${lines[1].id}')), const Offset(-500, 0));
+      await settle(tester);
+      await tester.tap(find.text('Undo')); // undoes the newest only
+      await settle(tester);
+      expect(find.text('Two'), findsOneWidget);
+      expect(find.text('One'), findsNothing);
     });
 
     testApp('Next time shows every line, oldest first, in full width', (tester) async {
@@ -467,7 +498,6 @@ void main() {
       await tester.enterText(find.byKey(const Key('phone-field')), '+351 912 345 678');
       await tester.enterText(find.byKey(const Key('edit-interval')), '10');
       await tester.enterText(find.byKey(const Key('edit-hometown')), 'Porto');
-      await tester.enterText(find.byKey(const Key('edit-socials')), '@sam.r');
       await tester.tap(find.byKey(const Key('channel-call')));
       await pickBirthday(tester, 'Jan', '14');
       await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
@@ -481,7 +511,7 @@ void main() {
       expect(p.phone, '+351912345678');
       expect(p.intervalOverrideDays, 10);
       expect(p.hometown, 'Porto');
-      expect(p.socials, '["@sam.r"]');
+      expect(p.socials, isNull); // untouched by editing
       expect(p.birthday, '--01-14');
       expect(find.text('Samuel'), findsOneWidget);
       expect(find.text('Jan 14'), findsOneWidget);
@@ -731,6 +761,24 @@ void main() {
       expect(launcher.calls, ['ig-dm:sam.r']);
     });
 
+    testApp('Facebook as the contact opens a Messenger chat', (tester) async {
+      await prefer('facebook');
+      await repo.updatePerson(sam, const PeopleCompanion(facebook: Value('sam.rodrigues')));
+      await openProfile(tester);
+      expect(find.text('Facebook'), findsOneWidget); // Prefers
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['messenger:sam.rodrigues']);
+      expect((await repo.getSettings()).recentContactPersonId, sam);
+    });
+
+    testApp('Facebook preferred but no profile saved: disabled, and says what to add', (tester) async {
+      await prefer('facebook');
+      await openProfile(tester);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
+      expect(find.textContaining('Add their Facebook profile'), findsOneWidget);
+    });
+
     testApp('if the app cannot be opened it says so, and still remembers the attempt', (tester) async {
       launcher = FakeLauncher(works: false);
       await prefer('whatsapp');
@@ -789,7 +837,7 @@ void main() {
       expect(launcher.calls, ['call:+3515550142']);
     });
 
-    testApp('Instagram offers a DM or their profile; only the DM counts as trying to talk', (tester) async {
+    testApp('their Instagram opens straight to their profile, and that is not an attempt to talk', (tester) async {
       await repo.updatePerson(sam, const PeopleCompanion(instagram: Value('sam.r')));
       await openProfile(tester);
       await tester.tap(find.byKey(const Key('profile-more')));
@@ -797,29 +845,42 @@ void main() {
       expect(find.text('@sam.r'), findsOneWidget);
       await tester.tap(find.byKey(const Key('fact-Instagram')));
       await settle(tester);
-      expect(find.text('Open DM'), findsOneWidget);
-      expect(find.text('Open profile'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('ig-profile')));
-      await settle(tester);
-      expect(launcher.calls, ['ig-profile:sam.r']);
+      expect(launcher.calls, ['ig-profile:sam.r']); // no chooser, no DM
+      expect(find.text('Open DM'), findsNothing);
       expect((await repo.getSettings()).recentContactPersonId, isNull);
-
-      await tester.tap(find.byKey(const Key('fact-Instagram')));
-      await settle(tester);
-      await tester.tap(find.byKey(const Key('ig-dm')));
-      await settle(tester);
-      expect(launcher.calls, ['ig-profile:sam.r', 'ig-dm:sam.r']);
-      expect((await repo.getSettings()).recentContactPersonId, sam);
     });
 
-    testApp('with no Instagram saved the row is plain text', (tester) async {
+    testApp('their Facebook opens straight to their profile', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(facebook: Value('sam.rodrigues')));
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('sam.rodrigues'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('fact-Facebook')));
+      await settle(tester);
+      expect(launcher.calls, ['facebook:sam.rodrigues']);
+      expect((await repo.getSettings()).recentContactPersonId, isNull);
+    });
+
+    testApp('a profile that cannot be opened says so', (tester) async {
+      launcher = FakeLauncher(works: false);
+      await repo.updatePerson(sam, const PeopleCompanion(instagram: Value('sam.r')));
       await openProfile(tester);
       await tester.tap(find.byKey(const Key('profile-more')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('fact-Instagram')));
       await settle(tester);
-      expect(find.text('Open DM'), findsNothing);
+      expect(find.text('Could not open Instagram. Is it installed?'), findsOneWidget);
+    });
+
+    testApp('with no Instagram or Facebook saved the rows are plain text', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Instagram')));
+      await tester.tap(find.byKey(const Key('fact-Facebook')));
+      await settle(tester);
+      expect(launcher.calls, isEmpty);
     });
   });
 
@@ -925,6 +986,35 @@ void main() {
       final p = (await repo.getPerson(sam))!;
       expect(p.contactMethodType, 'whatsapp');
       expect(p.instagram, 'sam.r');
+    });
+
+    testApp('choosing Facebook, with a link, saves the username and says Messenger', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('channel-facebook')));
+      await tester.pumpAndSettle();
+      expect(find.text('Contact opens straight to Facebook Messenger.'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('edit-facebook')), 'https://www.facebook.com/sam.rodrigues?ref=bookmarks');
+      await tester.pumpAndSettle();
+      await save(tester);
+      final p = (await repo.getPerson(sam))!;
+      expect((p.contactMethodType, p.contactMethodValue, p.facebook), ('facebook', 'sam.rodrigues', 'sam.rodrigues'));
+    });
+
+    testApp('a Facebook entry that is not a profile is explained and blocks Save', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('edit-facebook')), 'no');
+      await tester.pumpAndSettle();
+      expect(find.text("That doesn't look like a Facebook profile"), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save changes')).onPressed, isNull);
+    });
+
+    testApp('the old free-text socials field is gone from Edit person', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      expect(find.byKey(const Key('edit-socials')), findsNothing);
+      expect(find.text('OTHER SOCIALS'), findsNothing);
     });
 
     testApp('an Instagram entry that is not a username is explained and blocks Save', (tester) async {
