@@ -494,7 +494,9 @@ class _HeroCardState extends ConsumerState<_HeroCard> {
           const SizedBox(height: 8),
           OutlinedButton(key: const Key('hero-log'), onPressed: widget.onLog, child: const Text('Log')),
           const SizedBox(height: 6),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          // A Wrap, so a narrow phone or large text puts the second link on the
+          // next line instead of overflowing.
+          Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, children: [
             TextButton(key: const Key('hero-skip'), style: muted, onPressed: widget.onSkip, child: const Text('Not today')),
             Text('·', style: TextStyle(color: c.muted)),
             TextButton(

@@ -11,6 +11,8 @@ import '../../ui/city_picker.dart';
 Future<bool> showFinishSetupSheet(BuildContext context, PersonRow person) async {
   final done = await showModalBottomSheet<bool>(
     context: context,
+    // Keep clear of the camera cutout and the status bar.
+    useSafeArea: true,
     isScrollControlled: true,
     builder: (_) => FinishSetupSheet(person: person),
   );

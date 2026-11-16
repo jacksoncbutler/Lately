@@ -92,6 +92,8 @@ class _PhoneFieldState extends State<PhoneField> {
   Future<void> _pickCountry() async {
     final iso = await showModalBottomSheet<String>(
       context: context,
+      // Keep clear of the camera cutout and the status bar.
+      useSafeArea: true,
       isScrollControlled: true,
       builder: (_) => _CountrySheet(first: [?widget.homeIso, defaultCountryIso], selected: _iso),
     );
@@ -186,6 +188,7 @@ class _CountrySheetState extends State<_CountrySheet> {
             child: list.isEmpty
                 ? const Center(child: Text('No country matches that.'))
                 : ListView.builder(
+                    padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
                     itemCount: list.length,
                     itemBuilder: (context, i) {
                       final c = list[i];

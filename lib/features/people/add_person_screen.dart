@@ -100,7 +100,7 @@ class _AddPersonScreenState extends ConsumerState<AddPersonScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Add a person')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
         children: [
           Text('Name', style: t.labelLarge),
           const SizedBox(height: 4),

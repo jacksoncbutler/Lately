@@ -192,3 +192,42 @@ void showUndoBar(BuildContext context, String message, VoidCallback onUndo) {
     duration: const Duration(seconds: 3),
   ));
 }
+
+/// Swipe left to delete any row, the same as a line: no confirmation, and the
+/// caller shows the Undo bar. Swiping right does nothing.
+class DeleteOnSwipe extends StatefulWidget {
+  const DeleteOnSwipe({super.key, required this.id, required this.onDelete, required this.child});
+  final String id;
+  final VoidCallback onDelete;
+  final Widget child;
+
+  @override
+  State<DeleteOnSwipe> createState() => _DeleteOnSwipeState();
+}
+
+class _DeleteOnSwipeState extends State<DeleteOnSwipe> {
+  bool _gone = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_gone) return const SizedBox.shrink();
+    final c = LatelyColors.of(context);
+    return Dismissible(
+      key: Key('dismiss-${widget.id}'),
+      direction: DismissDirection.endToStart,
+      dismissThresholds: const {DismissDirection.endToStart: 0.35},
+      background: Container(
+        color: c.dangerSoft,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text('Delete',
+            style: TextStyle(color: c.danger, fontWeight: FontWeight.w700, fontSize: 13)),
+      ),
+      onDismissed: (_) {
+        setState(() => _gone = true);
+        widget.onDelete();
+      },
+      child: widget.child,
+    );
+  }
+}

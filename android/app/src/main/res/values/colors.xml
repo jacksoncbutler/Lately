@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's paper colour, shown while it starts so there is no white flash. -->
+    <color name="launch_paper">#FAF7F2</color>
+</resources>

@@ -9,6 +9,15 @@ import 'database.dart';
 /// only: no ranking rules here (those live in lib/domain).
 /// Every write stamps updatedAt in UTC. Reads skip soft-deleted rows.
 /// Drift returns DateTimes in local time; call .toUtc() before exporting.
+/// What a deleted chat was tied to, so Undo can put it all back.
+class DeletedChat {
+  const DeletedChat(this.chatId, this.coveredLineIds, this.addedLineIds, this.addedRelationshipIds);
+  final String chatId;
+  final List<String> coveredLineIds;
+  final List<String> addedLineIds;
+  final List<String> addedRelationshipIds;
+}
+
 class Repository {
   Repository(this.db, {DateTime Function()? clock})
       : _clock = clock ?? DateTime.now;
@@ -473,6 +482,48 @@ class Repository {
       return chatId;
     });
   }
+
+  /// Deletes a chat (soft). Next time items it covered become offerable again,
+  /// and the lines and people added in it stay but lose the link. The person's
+  /// last contact is recomputed from the chats that remain. Undo with [restoreChat].
+  Future<DeletedChat> deleteChatWithLinks(String chatId) => db.transaction(() async {
+        final lines = await (db.select(db.lines)
+              ..where((t) =>
+                  t.deletedAt.isNull() & (t.chatId.equals(chatId) | t.addedInChatId.equals(chatId))))
+            .get();
+        final covered = [for (final l in lines) if (l.chatId == chatId) l.id];
+        final added = [for (final l in lines) if (l.addedInChatId == chatId) l.id];
+        final rels = [
+          for (final r in await (db.select(db.relationships)
+                ..where((t) => t.deletedAt.isNull() & t.addedInChatId.equals(chatId)))
+              .get())
+            r.id
+        ];
+        for (final id in covered) {
+          await updateLine(id, const LinesCompanion(chatId: Value(null)));
+        }
+        for (final id in added) {
+          await updateLine(id, const LinesCompanion(addedInChatId: Value(null)));
+        }
+        for (final id in rels) {
+          await updateRelationship(id, const RelationshipsCompanion(addedInChatId: Value(null)));
+        }
+        await deleteChat(chatId);
+        return DeletedChat(chatId, covered, added, rels);
+      });
+
+  Future<void> restoreChat(DeletedChat d) => db.transaction(() async {
+        await updateChat(d.chatId, const ChatsCompanion(deletedAt: Value(null)));
+        for (final id in d.coveredLineIds) {
+          await updateLine(id, LinesCompanion(chatId: Value(d.chatId)));
+        }
+        for (final id in d.addedLineIds) {
+          await updateLine(id, LinesCompanion(addedInChatId: Value(d.chatId)));
+        }
+        for (final id in d.addedRelationshipIds) {
+          await updateRelationship(id, RelationshipsCompanion(addedInChatId: Value(d.chatId)));
+        }
+      });
 
   /// Last contact for every active person: newest chat, else the estimate.
   Future<Map<String, DateTime?>> lastContactByPerson() async {

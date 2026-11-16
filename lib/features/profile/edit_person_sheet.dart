@@ -20,6 +20,8 @@ enum EditOutcome { saved, archived, restored, deleted }
 Future<EditOutcome?> showEditPersonSheet(BuildContext context, PersonRow person) =>
     showModalBottomSheet<EditOutcome>(
       context: context,
+      // Keep clear of the camera cutout and the status bar.
+      useSafeArea: true,
       isScrollControlled: true,
       builder: (_) => FractionallySizedBox(
         heightFactor: 0.94,
@@ -332,7 +334,9 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
           ),
         ),
         const Divider(),
-        Padding(
+        SafeArea(
+          top: false,
+          child: Padding(
           padding: const EdgeInsets.all(12),
           child: SizedBox(
             width: double.infinity,
@@ -344,6 +348,7 @@ class _EditPersonSheetState extends ConsumerState<EditPersonSheet> {
                   : _save,
               child: const Text('Save changes'),
             ),
+          ),
           ),
         ),
       ]),

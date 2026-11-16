@@ -5,6 +5,7 @@ import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../domain/profile_format.dart';
 import '../../domain/ranking.dart';
+import '../../ui/card_slice.dart';
 import '../home/home_data.dart';
 import '../profile/profile_screen.dart';
 
@@ -45,29 +46,25 @@ class DatesScreen extends ConsumerWidget {
                         textAlign: TextAlign.center),
                   ),
                 )
-              : ListView(
+              : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-                  children: [
-                    Card(
-                      child: Column(children: [
-                        for (var i = 0; i < list.length; i++) ...[
-                          if (i > 0) const Divider(),
-                          ListTile(
-                            key: Key('date-$i'),
-                            title: Text(list[i].label, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: _sub(list[i]) == null ? null : Text(_sub(list[i])!),
-                            trailing: Text(
-                              list[i].days == 0 ? 'Today' : weekdayDate(list[i].date),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                                builder: (_) => ProfileScreen(
-                                    personId: list[i].personId, backLabel: 'Dates'))),
-                          ),
-                        ],
-                      ]),
+                  itemCount: list.length,
+                  itemBuilder: (context, i) => CardSlice(
+                    first: i == 0,
+                    last: i == list.length - 1,
+                    child: ListTile(
+                      key: Key('date-$i'),
+                      title: Text(list[i].label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: _sub(list[i]) == null ? null : Text(_sub(list[i])!),
+                      trailing: Text(
+                        list[i].days == 0 ? 'Today' : weekdayDate(list[i].date),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ProfileScreen(personId: list[i].personId, backLabel: 'Dates'))),
                     ),
-                  ],
+                  ),
                 ),
     );
   }

@@ -280,3 +280,13 @@ The Flutter project lives at the repository root, next to `docs/` and `reference
 - Collapsed, every profile block (Next time, Their people, Interests, About, custom sections) is the same size: a header, three 44-point rows, and a reserved See all row. Long lines are cut off with an ellipsis, adding or editing a line does not change the size, and a block grows only when you tap See all (then it goes full width and shows every line in full; Show less restores it). Notes inside a Their people card are the one exception and grow as needed.
 - Next time on Home's card works the same way: three lines, See all expands in place.
 - The app is portrait only (manifest lock plus `SystemChrome`). Other orientations and form factors come later.
+
+## Step 9: polish (version 0.11.0)
+
+- Orbit launcher icon (adaptive, themed and legacy) from `tool/make_icon.py`; the launch screen is the app's paper colour in light and dark.
+- Camera cutouts, islands and gesture bars: every bottom sheet uses the safe area, footers sit above the gesture bar, the system bars draw transparent with readable icons in light and dark. Tested with simulated insets on every screen.
+- Small phones and large text: no screen overflows at 360 dp wide or at 1.5 times text.
+- 200 people: the People list, Dates and the log popup's person list are built lazily, tabs are built the first time they are opened, and the ranking of 200 people takes a few milliseconds. Export, validate and import of 200 people with 1,000 chats each take well under a second.
+- Deleting a chat: swipe left in Recent chats (with Undo). Next time items it covered become offerable again; lines and people it added stay.
+- Settings shows the installed version.
+- Privacy promises (no INTERNET, no analytics, backups off, one permission) are tests, so a later change cannot break them silently.

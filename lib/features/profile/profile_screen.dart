@@ -11,6 +11,7 @@ import '../../domain/profile_format.dart';
 import '../../domain/reach.dart';
 import '../../domain/social.dart';
 import '../../domain/timezones.dart';
+import '../../ui/swipe_line.dart';
 import '../../ui/theme.dart';
 import 'edit_person_sheet.dart';
 import 'finish_setup_sheet.dart';
@@ -232,8 +233,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   SizedBox(
                     height: 44,
                     child: Row(children: [
-                      Text('Recent chats',
-                          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Flexible(
+                        child: Text('Recent chats',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      ),
+                      const SizedBox(width: 8),
                       const Spacer(),
                       Text('${chats.length} logged', style: t.bodySmall),
                     ]),
@@ -245,7 +251,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     )
                   else
                     for (final ch in (_allChats ? chats : chats.take(2)))
-                      InkWell(
+                      DeleteOnSwipe(
+                        key: Key('swipe-chat-${ch.id}'),
+                        id: 'chat-${ch.id}',
+                        onDelete: () async {
+                          final deleted = await repo.deleteChatWithLinks(ch.id);
+                          if (context.mounted) {
+                            showUndoBar(context, 'Chat deleted', () => repo.restoreChat(deleted));
+                          }
+                        },
+                        child: Material(
+                          color: c.surface,
+                          child: InkWell(
                         key: Key('chat-${ch.id}'),
                         onTap: () => showChatDetailSheet(context, personId: person.id, chat: ch),
                         child: Container(
@@ -286,6 +303,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             Icon(Icons.chevron_right, color: c.muted),
                           ]),
+                        ),
+                      ),
                         ),
                       ),
                   if (chats.length > 2)

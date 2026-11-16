@@ -8,6 +8,7 @@ import '../../domain/chat_rules.dart';
 import '../../domain/ranking.dart';
 import '../../domain/timezones.dart';
 import '../../ui/add_people_menu.dart';
+import '../../ui/card_slice.dart';
 import '../../ui/log_fab.dart';
 import '../../ui/theme.dart';
 import '../home/home_data.dart';
@@ -32,8 +33,29 @@ class PeopleScreen extends ConsumerStatefulWidget {
   ConsumerState<PeopleScreen> createState() => _PeopleScreenState();
 }
 
+// What the list is made of. It is built lazily, so a long list stays quick.
+sealed class _Item {}
+
+class _Header extends _Item {
+  _Header(this.text);
+  final String text;
+}
+
+class _PersonItem extends _Item {
+  _PersonItem(this.person, {required this.first, required this.last});
+  final PersonRow person;
+  final bool first, last;
+}
+
+class _ArchivedToggle extends _Item {
+  _ArchivedToggle(this.count, this.open);
+  final int count;
+  final bool open;
+}
+
 class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   String _query = '';
+  bool _archivedOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -61,29 +83,6 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     final shown = people.where(match).toList();
     final shownArchived = archived.where(match).toList();
 
-    Widget tile(PersonRow p) {
-      final r = rows[p.id];
-      final unfinished = needsFinishing(p);
-      final sub = unfinished
-          ? 'Finish setup to get suggestions'
-          : '${r == null ? '' : 'Last talked ${agoText(r.days)} · '}${clockText(p.timezone, now)} there';
-      final status = (r == null || unfinished) ? null : _statusLabels[r.status];
-      return ListTile(
-        key: Key('person-${p.id}'),
-        leading: CircleAvatar(
-          backgroundColor: c.accent,
-          foregroundColor: c.onAccent,
-          child: Text(p.displayName.characters.first.toUpperCase()),
-        ),
-        title: Text(p.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(sub),
-        trailing: unfinished
-            ? const Chip(label: Text('Finish setup'), visualDensity: VisualDensity.compact)
-            : (status == null ? null : _Tag(status)),
-        onTap: () => _open(context, p),
-      );
-    }
-
     // Longest since you talked first; people still to finish go last.
     int byDays(PersonRow a, PersonRow b) {
       final ra = rows[a.id], rb = rows[b.id];
@@ -93,23 +92,48 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       return rb.days.compareTo(ra.days);
     }
 
-    final sections = <Widget>[];
+    final items = <_Item>[];
     for (final g in groups) {
       final members = shown.where((p) => p.groupId == g.id).toList()..sort(byDays);
       if (members.isEmpty) continue;
-      sections.add(Padding(
-        padding: const EdgeInsets.only(top: 16, bottom: 6),
-        child: Text('${g.name} · every ${g.defaultIntervalDays} days'.toUpperCase(),
-            style: t.labelSmall?.copyWith(letterSpacing: 0.9, fontWeight: FontWeight.w600)),
-      ));
-      sections.add(Card(
-        child: Column(children: [
-          for (var i = 0; i < members.length; i++) ...[
-            if (i > 0) const Divider(),
-            tile(members[i]),
-          ],
-        ]),
-      ));
+      items.add(_Header('${g.name} · every ${g.defaultIntervalDays} days'));
+      for (var i = 0; i < members.length; i++) {
+        items.add(_PersonItem(members[i], first: i == 0, last: i == members.length - 1));
+      }
+    }
+    if (shownArchived.isNotEmpty) {
+      items.add(_ArchivedToggle(shownArchived.length, _archivedOpen));
+      if (_archivedOpen) {
+        for (var i = 0; i < shownArchived.length; i++) {
+          items.add(_PersonItem(shownArchived[i], first: i == 0, last: i == shownArchived.length - 1));
+        }
+      }
+    }
+
+    Widget personTile(PersonRow p) {
+      final isArchived = p.archivedAt != null;
+      final r = rows[p.id];
+      final unfinished = needsFinishing(p) && !isArchived;
+      final sub = isArchived
+          ? 'Archived'
+          : unfinished
+              ? 'Finish setup to get suggestions'
+              : '${r == null ? '' : 'Last talked ${agoText(r.days)} · '}${clockText(p.timezone, now)} there';
+      final status = (r == null || unfinished || isArchived) ? null : _statusLabels[r.status];
+      return ListTile(
+        key: Key('person-${p.id}'),
+        leading: CircleAvatar(
+          backgroundColor: isArchived ? c.soft : c.accent,
+          foregroundColor: isArchived ? c.muted : c.onAccent,
+          child: Text(p.displayName.characters.first.toUpperCase()),
+        ),
+        title: Text(p.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(sub),
+        trailing: unfinished
+            ? const Chip(label: Text('Finish setup'), visualDensity: VisualDensity.compact)
+            : (status == null ? (isArchived ? null : const Icon(Icons.chevron_right)) : _Tag(status)),
+        onTap: () => _open(context, p),
+      );
     }
 
     return Scaffold(
@@ -120,10 +144,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: people.isEmpty ? null : const LogFab(),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 0, 18, 110),
-        children: [
-          TextField(
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
+          child: TextField(
             key: const Key('people-search'),
             decoration: const InputDecoration(
               hintText: 'Search people',
@@ -131,51 +155,53 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             ),
             onChanged: (v) => setState(() => _query = v),
           ),
-          if (people.isEmpty && archived.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 48),
-              child: Center(child: Text('No one yet. Tap + to add people.')),
-            )
-          else if (shown.isEmpty && shownArchived.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 48),
-              child: Center(child: Text('No one matches that search.')),
-            ),
-          ...sections,
-          if (shownArchived.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  key: const Key('archived-section'),
-                  tilePadding: EdgeInsets.zero,
-                  title: Text('Archived (${shownArchived.length})',
-                      style: TextStyle(color: c.muted, fontWeight: FontWeight.w600)),
-                  children: [
-                    Card(
-                      child: Column(children: [
-                        for (final p in shownArchived)
-                          ListTile(
-                            key: Key('person-${p.id}'),
-                            leading: CircleAvatar(
-                              backgroundColor: c.soft,
-                              foregroundColor: c.muted,
-                              child: Text(p.displayName.characters.first.toUpperCase()),
+        ),
+        Expanded(
+          child: items.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 48),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Text(people.isEmpty && archived.isEmpty
+                        ? 'No one yet. Tap + to add people.'
+                        : 'No one matches that search.'),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 110),
+                  itemCount: items.length,
+                  itemBuilder: (context, i) {
+                    final it = items[i];
+                    switch (it) {
+                      case _Header():
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 16, bottom: 6),
+                          child: Text(it.text.toUpperCase(),
+                              style: t.labelSmall
+                                  ?.copyWith(letterSpacing: 0.9, fontWeight: FontWeight.w600)),
+                        );
+                      case _PersonItem():
+                        return CardSlice(first: it.first, last: it.last, child: personTile(it.person));
+                      case _ArchivedToggle():
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              key: const Key('archived-section'),
+                              style: TextButton.styleFrom(foregroundColor: c.muted),
+                              onPressed: () => setState(() => _archivedOpen = !_archivedOpen),
+                              icon: Icon(it.open ? Icons.expand_less : Icons.expand_more),
+                              label: Text('Archived (${it.count})'),
+                              iconAlignment: IconAlignment.end,
                             ),
-                            title: Text(p.displayName,
-                                style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: const Text('Archived'),
-                            onTap: () => _open(context, p),
                           ),
-                      ]),
-                    ),
-                  ],
+                        );
+                    }
+                  },
                 ),
-              ),
-            ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 

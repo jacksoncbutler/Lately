@@ -12,6 +12,8 @@ Future<void> showChatDetailSheet(BuildContext context,
         {required String personId, required ChatRow chat}) =>
     showModalBottomSheet<void>(
       context: context,
+      // Keep clear of the camera cutout and the status bar.
+      useSafeArea: true,
       isScrollControlled: true,
       builder: (_) => ChatDetailSheet(personId: personId, chat: chat),
     );

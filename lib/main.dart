@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -42,6 +43,21 @@ Future<void> main() async {
   }
 }
 
+/// Status and navigation bar icons that stay readable on the app's paper
+/// colour in light and dark (the app draws behind the bars on newer Android).
+SystemUiOverlayStyle systemUiStyleFor(Brightness b) {
+  final dark = b == Brightness.dark;
+  return SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+    statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+    systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+    systemNavigationBarContrastEnforced: false,
+  );
+}
+
 class LatelyApp extends StatelessWidget {
   const LatelyApp({super.key});
 
@@ -52,6 +68,10 @@ class LatelyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: latelyThemeFor(Brightness.light),
       darkTheme: latelyThemeFor(Brightness.dark),
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: systemUiStyleFor(Theme.of(context).brightness),
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const AppShell(),
     );
   }

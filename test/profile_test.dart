@@ -476,6 +476,74 @@ void main() {
     });
   });
 
+  group('deleting a chat (swipe left in Recent chats)', () {
+    Future<String> chat(DateTime at, String type, {String? note}) => repo.logChat(
+        personId: sam, occurredAt: at, type: type, depth: 'varied', durationMinutes: 30, note: note);
+
+    testApp('swipe left deletes it with an Undo bar and no confirmation; last contact is recomputed', (tester) async {
+      await chat(DateTime.utc(2026, 7, 30, 12), 'person');
+      await chat(DateTime.utc(2026, 9, 2, 12), 'text');
+      final newest = await chat(DateTime.utc(2026, 9, 21, 12), 'call', note: 'Newest');
+      await openProfile(tester);
+      expect(find.text('Sep 21'), findsWidgets); // last call or text
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$newest')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$newest')), const Offset(-500, 0));
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Undo'), findsOneWidget);
+      expect(await repo.getChat(newest), isNull);
+      expect(find.text('2 logged'), findsOneWidget);
+      // The call is gone, so the last call or text is now the Sep 2 text.
+      expect(find.byKey(Key('chat-$newest')), findsNothing);
+      final facts = find.byKey(const Key('fact-Last call or text'));
+      expect(find.descendant(of: facts, matching: find.text('Sep 2')), findsOneWidget);
+    });
+
+    testApp('Undo brings it back', (tester) async {
+      final c = await chat(DateTime.utc(2026, 9, 21, 12), 'call', note: 'Keep me');
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$c')), const Offset(-500, 0));
+      await settle(tester);
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect(await repo.getChat(c), isNotNull);
+      expect(find.text('Keep me'), findsOneWidget);
+    });
+
+    testApp('swiping right does nothing', (tester) async {
+      final c = await chat(DateTime.utc(2026, 9, 21, 12), 'call');
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$c')), const Offset(500, 0));
+      await settle(tester);
+      expect(await repo.getChat(c), isNotNull);
+    });
+
+    testApp('tapping a chat still opens its details', (tester) async {
+      final c = await chat(DateTime.utc(2026, 9, 21, 12), 'call', note: 'Caught up');
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.byKey(Key('chat-$c')));
+      await settle(tester);
+      expect(find.descendant(of: find.byType(BottomSheet), matching: find.text('What it was about'.toUpperCase())), findsOneWidget);
+    });
+
+    testApp('a Next time item it covered is offered again for the next chat', (tester) async {
+      final l = await repo.createLine(personId: sam, block: 'next_time', text: 'Ask about the job');
+      await repo.setLineDone(l, true);
+      final c = await repo.logChat(personId: sam, occurredAt: DateTime.utc(2026, 9, 21, 12), type: 'call', depth: 'varied', durationMinutes: 30, coveredLineIds: [l]);
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$c')), const Offset(-500, 0));
+      await settle(tester);
+      expect((await repo.linesFor(sam)).single.chatId, isNull);
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect((await repo.linesFor(sam)).single.chatId, c);
+    });
+  });
+
   group('blocks', () {
     testApp('an empty block keeps its size with ruled blank rows', (tester) async {
       await openProfile(tester);

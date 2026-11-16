@@ -28,6 +28,8 @@ Future<RelationshipResult?> showRelationshipSheet(
 }) =>
     showModalBottomSheet<RelationshipResult>(
       context: context,
+      // Keep clear of the camera cutout and the status bar.
+      useSafeArea: true,
       isScrollControlled: true,
       builder: (_) => FractionallySizedBox(
         heightFactor: 0.92,
@@ -248,7 +250,9 @@ class _RelationshipSheetState extends ConsumerState<RelationshipSheet> {
           ),
         ),
         const Divider(),
-        Padding(
+        SafeArea(
+          top: false,
+          child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(children: [
             if (_id != null)
@@ -271,6 +275,7 @@ class _RelationshipSheetState extends ConsumerState<RelationshipSheet> {
               ),
             ),
           ]),
+        ),
         ),
       ]),
     );

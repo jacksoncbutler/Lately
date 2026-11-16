@@ -40,6 +40,8 @@ Future<void> showLogSheet(BuildContext context, {String? personId}) async {
   final suggested = container.read(suggestedPersonProvider) ?? id;
   await showModalBottomSheet<void>(
     context: context,
+    // Keep clear of the camera cutout and the status bar.
+    useSafeArea: true,
     isScrollControlled: true,
     builder: (_) => FractionallySizedBox(
       heightFactor: 0.94,

@@ -112,7 +112,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
       body: groups == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Text('How often would you like to talk to each group?', style: t.titleMedium),
                 const SizedBox(height: 4),

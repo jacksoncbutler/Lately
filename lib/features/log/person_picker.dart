@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../domain/chat_rules.dart';
+import '../../ui/card_slice.dart';
 import '../../ui/theme.dart';
 
 /// Searchable list of people grouped like the People tab, with how long since
@@ -49,10 +50,22 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
       return d == null ? null : daysSince(d, now);
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-      children: [
-        Row(children: [
+    // Pinned search on top, and a lazily built list: 200 people stay quick.
+    final entries = <Object>[]; // String = a group header, PersonRow = a person
+    final lastIndexOfGroup = <int>{};
+    for (final g in groups) {
+      final members = shown.where((p) => p.groupId == g.id).toList()
+        ..sort((a, b) => (days(b) ?? -1).compareTo(days(a) ?? -1));
+      if (members.isEmpty) continue;
+      entries.add(g.name);
+      entries.addAll(members);
+      lastIndexOfGroup.add(entries.length - 1);
+    }
+
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+        child: Row(children: [
           Expanded(
             child: TextField(
               key: const Key('picker-search'),
@@ -63,53 +76,58 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
           ),
           TextButton(onPressed: widget.onBack, child: const Text('Back')),
         ]),
-        const SizedBox(height: 12),
-        for (final g in groups)
-          if (shown.any((p) => p.groupId == g.id)) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 6),
-              child: Text(g.name.toUpperCase(),
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(letterSpacing: 0.9, fontWeight: FontWeight.w600)),
-            ),
-            Card(
-              child: Column(children: [
-                for (final p in (shown.where((x) => x.groupId == g.id).toList()
-                  ..sort((a, b) => (days(b) ?? -1).compareTo(days(a) ?? -1))))
-                  ListTile(
-                    key: Key('pick-${p.id}'),
-                    leading: CircleAvatar(
-                      backgroundColor: c.accent,
-                      foregroundColor: c.onAccent,
-                      child: Text(p.displayName.characters.first.toUpperCase()),
+      ),
+      Expanded(
+        child: entries.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(24),
+                child: Align(
+                    alignment: Alignment.topCenter, child: Text('No one matches that search.')),
+              )
+            : ListView.builder(
+                padding: EdgeInsets.fromLTRB(18, 8, 18, 24 + MediaQuery.paddingOf(context).bottom),
+                itemCount: entries.length,
+                itemBuilder: (context, i) {
+                  final e = entries[i];
+                  if (e is String) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 6),
+                      child: Text(e.toUpperCase(),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(letterSpacing: 0.9, fontWeight: FontWeight.w600)),
+                    );
+                  }
+                  final p = e as PersonRow;
+                  return CardSlice(
+                    first: entries[i - 1] is String,
+                    last: lastIndexOfGroup.contains(i),
+                    child: ListTile(
+                      key: Key('pick-${p.id}'),
+                      leading: CircleAvatar(
+                        backgroundColor: c.accent,
+                        foregroundColor: c.onAccent,
+                        child: Text(p.displayName.characters.first.toUpperCase()),
+                      ),
+                      title: Text(p.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(days(p) == null ? 'Not talked yet' : 'Last talked ${agoText(days(p)!)}'),
+                      trailing: widget.suggestedId == p.id
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                              decoration:
+                                  BoxDecoration(color: c.soft, borderRadius: BorderRadius.circular(10)),
+                              child: Text('Suggested',
+                                  style: TextStyle(
+                                      fontSize: 12, fontWeight: FontWeight.w600, color: c.muted)),
+                            )
+                          : null,
+                      onTap: () => widget.onPick(p.id),
                     ),
-                    title: Text(p.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(days(p) == null
-                        ? 'Not talked yet'
-                        : 'Last talked ${agoText(days(p)!)}'),
-                    trailing: widget.suggestedId == p.id
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                            decoration: BoxDecoration(
-                                color: c.soft, borderRadius: BorderRadius.circular(10)),
-                            child: Text('Suggested',
-                                style: TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.w600, color: c.muted)),
-                          )
-                        : null,
-                    onTap: () => widget.onPick(p.id),
-                  ),
-              ]),
-            ),
-          ],
-        if (shown.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: Text('No one matches that search.')),
-          ),
-      ],
-    );
+                  );
+                },
+              ),
+      ),
+    ]);
   }
 }

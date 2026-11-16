@@ -10,6 +10,8 @@ import 'contact_action.dart';
 Future<void> showNumberOptions(BuildContext context, PersonRow person) =>
     showModalBottomSheet<void>(
       context: context,
+      // Keep clear of the camera cutout and the status bar.
+      useSafeArea: true,
       builder: (_) => _OptionsSheet(
         person: person,
         title: 'Reach ${person.displayName}',

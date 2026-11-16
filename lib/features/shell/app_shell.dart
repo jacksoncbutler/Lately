@@ -22,7 +22,7 @@ class AppShell extends ConsumerWidget {
 
     final tab = ref.watch(tabIndexProvider);
     return Scaffold(
-      body: IndexedStack(
+      body: _LazyTabs(
         index: tab,
         children: const [HomeScreen(), PeopleScreen(), DatesScreen()],
       ),
@@ -47,6 +47,34 @@ class AppShell extends ConsumerWidget {
               label: 'Dates'),
         ],
       ),
+    );
+  }
+}
+
+/// Like an IndexedStack, but a tab is only built the first time you open it
+/// (so the app starts without building a long People list nobody asked for),
+/// and then it is kept, so it holds its place.
+class _LazyTabs extends StatefulWidget {
+  const _LazyTabs({required this.index, required this.children});
+  final int index;
+  final List<Widget> children;
+
+  @override
+  State<_LazyTabs> createState() => _LazyTabsState();
+}
+
+class _LazyTabsState extends State<_LazyTabs> {
+  late final Set<int> _built = {widget.index};
+
+  @override
+  Widget build(BuildContext context) {
+    _built.add(widget.index);
+    return IndexedStack(
+      index: widget.index,
+      children: [
+        for (var i = 0; i < widget.children.length; i++)
+          _built.contains(i) ? widget.children[i] : const SizedBox.shrink(),
+      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app_config.dart';
 import '../../data/backup/backup_codec.dart';
 import '../../data/backup/backup_models.dart';
 import '../../data/providers.dart';
@@ -171,7 +172,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom),
         children: [
           Text('Backup', style: text.titleMedium),
           const SizedBox(height: 4),
@@ -209,6 +210,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const BlockOrderSection(),
           const Divider(height: 32),
           const AwakeSection(),
+          const Divider(height: 40),
+          Center(
+            child: Text('${AppConfig.appName} ${AppConfig.appVersion}',
+                key: const Key('app-version'), style: text.bodySmall),
+          ),
         ],
       ),
     );

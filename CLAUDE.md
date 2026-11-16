@@ -8,6 +8,9 @@ Lately is a personal, offline, device-only mobile app that ranks who to talk to 
 3. `docs/screens/`: how each screen looks.
 4. `reference/`: `logic.js` + `test.js` (ranking rules, ported first, keep the tests), `prototype/lately-prototype.html` (open in a browser; behaviour of record for anything the docs leave open). Run the logic tests with `node test.js` inside `reference/` (prints "all passed").
 
+## Status
+All nine build steps are done (0.11.0). Android is first; iPhone is a separate later step (see `docs/RELEASING.md`). New work is feature requests and polish, each still ending in something to install and check on the Pixel.
+
 ## Working method
 - Follow the nine steps in "Build order" in the technical plan, one at a time. Each step ends with something Jackson can install on his Pixel 7a (GrapheneOS) and check. Do not start the next step before that.
 - Keep data and logic layers free of UI code. Port `reference/logic.js` to Dart as pure functions with the same tests; all tunable numbers live in one constants file (dueFloor 0.6, chipPenalty 0.6, gapBoost 2, gapRatio 4, trustChats 5, historyDamp 0.6, expCap 90, chip15Max 20, chip30Min 20, chipLongMin 50).

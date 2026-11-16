@@ -166,4 +166,68 @@ void main() {
     final id = await repo.createPerson(displayName: 'Ana', groupId: g, timezone: 'UTC', contactMethodType: 'instagram', instagram: 'ana.s');
     expect((await repo.getPerson(id))!.instagram, 'ana.s');
   });
+
+  group('deleting a chat', () {
+    test('the last contact is worked out again from the chats that remain', () async {
+      final older = await repo.logChat(personId: sam, occurredAt: now.subtract(const Duration(days: 20)), type: 'text', depth: 'shallow', durationMinutes: 5);
+      final newer = await repo.logChat(personId: sam, occurredAt: now.subtract(const Duration(days: 2)), type: 'call', depth: 'deep', durationMinutes: 30);
+      final p = (await repo.getPerson(sam))!;
+      expect((await repo.lastContactOf(p))!.toUtc(), now.subtract(const Duration(days: 2)));
+      await repo.deleteChatWithLinks(newer);
+      expect((await repo.lastContactOf(p))!.toUtc(), now.subtract(const Duration(days: 20)));
+      await repo.deleteChatWithLinks(older);
+      // No chats left: back to the estimate.
+      expect((await repo.lastContactOf(p))!.toUtc(), now.subtract(const Duration(days: 100)));
+    });
+
+    test('Next time items it covered can be offered again; lines and people it added stay', () async {
+      final covered = await repo.createLine(personId: sam, block: 'next_time', text: 'Ask about the job');
+      final learned = await repo.createLine(personId: sam, block: 'interests', text: 'Pottery');
+      final rel = await repo.createRelationship(personId: sam, name: 'Ines');
+      final chat = await repo.logChat(personId: sam, occurredAt: now, type: 'call', depth: 'deep', durationMinutes: 30,
+          coveredLineIds: [covered], addedLineIds: [learned], addedRelationshipIds: [rel]);
+      final deleted = await repo.deleteChatWithLinks(chat);
+      expect(await repo.getChat(chat), isNull);
+      final lines = {for (final l in await repo.linesFor(sam)) l.id: l};
+      expect(lines[covered]!.chatId, isNull); // offered again
+      expect(lines[learned]!.addedInChatId, isNull); // kept, unlinked
+      expect(lines[learned]!.lineText, 'Pottery');
+      expect((await repo.relationshipsFor(sam)).single.addedInChatId, isNull);
+      expect(deleted.coveredLineIds, [covered]);
+    });
+
+    test('Undo puts the chat and every link back', () async {
+      final covered = await repo.createLine(personId: sam, block: 'next_time', text: 'Ask');
+      final learned = await repo.createLine(personId: sam, block: 'about', text: 'Fact');
+      final rel = await repo.createRelationship(personId: sam, name: 'Ines');
+      final chat = await repo.logChat(personId: sam, occurredAt: now, type: 'call', depth: 'deep', durationMinutes: 30,
+          coveredLineIds: [covered], addedLineIds: [learned], addedRelationshipIds: [rel]);
+      final deleted = await repo.deleteChatWithLinks(chat);
+      await repo.restoreChat(deleted);
+      expect(await repo.getChat(chat), isNotNull);
+      final lines = {for (final l in await repo.linesFor(sam)) l.id: l};
+      expect(lines[covered]!.chatId, chat);
+      expect(lines[learned]!.addedInChatId, chat);
+      expect((await repo.relationshipsFor(sam)).single.addedInChatId, chat);
+    });
+
+    test('a line that was already deleted stays deleted', () async {
+      final l = await repo.createLine(personId: sam, block: 'next_time', text: 'Gone');
+      final chat = await repo.logChat(personId: sam, occurredAt: now, type: 'call', depth: 'deep', durationMinutes: 30, coveredLineIds: [l]);
+      await repo.deleteLine(l);
+      final d = await repo.deleteChatWithLinks(chat);
+      expect(d.coveredLineIds, isEmpty);
+      await repo.restoreChat(d);
+      expect(await repo.linesFor(sam), isEmpty);
+    });
+
+    test('the chat only affects its own person', () async {
+      final g = (await repo.listGroups()).first.id;
+      final bo = await repo.createPerson(displayName: 'Bo', groupId: g, timezone: 'UTC', contactMethodType: 'text');
+      final mine = await repo.logChat(personId: sam, occurredAt: now, type: 'call', depth: 'deep', durationMinutes: 30);
+      await repo.logChat(personId: bo, occurredAt: now, type: 'call', depth: 'deep', durationMinutes: 30);
+      await repo.deleteChatWithLinks(mine);
+      expect(await repo.chatsFor(bo), hasLength(1));
+    });
+  });
 }
