@@ -274,3 +274,9 @@ The Flutter project lives at the repository root, next to `docs/` and `reference
 - Backup format 1.1 adds optional `instagram` and `unansweredAt` on people and the contact method types `whatsapp` and `instagram`; 1.2 adds optional `facebook` and the contact method type `facebook`. 1.0 and 1.1 files import unchanged.
 - The free-text socials field is gone from the screens. When the database upgrades, an @name or instagram.com link in it becomes the Instagram username, and a facebook.com, fb.com or m.me link becomes the Facebook username; anything else is left in the data untouched.
 - Undo bars disappear by themselves after 3 seconds (a Flutter snack bar with an action otherwise stays up until dismissed).
+
+## Block sizes and orientation (version 0.10.1)
+
+- Collapsed, every profile block (Next time, Their people, Interests, About, custom sections) is the same size: a header, three 44-point rows, and a reserved See all row. Long lines are cut off with an ellipsis, adding or editing a line does not change the size, and a block grows only when you tap See all (then it goes full width and shows every line in full; Show less restores it). Notes inside a Their people card are the one exception and grow as needed.
+- Next time on Home's card works the same way: three lines, See all expands in place.
+- The app is portrait only (manifest lock plus `SystemChrome`). Other orientations and form factors come later.

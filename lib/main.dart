@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'app_config.dart';
+import 'app_orientation.dart';
 import 'data/providers.dart';
 import 'data/safe_open.dart';
 import 'domain/timezones.dart';
@@ -15,6 +16,7 @@ import 'ui/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await lockToPortrait();
   ensureTimezonesLoaded();
   final docs = await getApplicationDocumentsDirectory();
   final support = await getApplicationSupportDirectory();

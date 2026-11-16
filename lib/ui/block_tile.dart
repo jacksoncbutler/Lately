@@ -11,8 +11,9 @@ class BlockItem {
 }
 
 /// A profile block: a title with a plus, short lines, faint ruled rows when
-/// empty, and "See all" when there are more than three. Next time shows every
-/// line with checkboxes and is always full width.
+/// empty, and "See all" when there are more than three. Collapsed, every block
+/// is the same size (three rows, long lines cut off with an ellipsis); it only
+/// grows when you tap See all. Next time has checkboxes and is always full width.
 class BlockTile extends StatefulWidget {
   const BlockTile({
     super.key,
@@ -35,10 +36,10 @@ class BlockTile extends StatefulWidget {
   final bool open;
   final ValueChanged<bool> onOpenChanged;
 
-  /// Next time: checkboxes, all lines, full width.
+  /// Next time: checkboxes, oldest first, always full width.
   final bool next;
 
-  /// Full width with all lines (a notes block inside a card).
+  /// Notes inside a card: every line, growing as needed (no See all).
   final bool wide;
 
   final ValueChanged<String>? onAdd;
@@ -62,6 +63,12 @@ class BlockTile extends StatefulWidget {
 class _BlockTileState extends State<BlockTile> {
   bool _adding = false;
 
+  /// Rows shown while a block is collapsed. Every collapsed block is the same
+  /// height whatever it holds: header, these rows, and a footer row.
+  static const _rows = 3;
+  static const _rowHeight = 44.0;
+  static const _footerHeight = 48.0;
+
   void _start() {
     if (widget.onAddRequest != null) {
       widget.onAddRequest!();
@@ -73,12 +80,22 @@ class _BlockTileState extends State<BlockTile> {
   @override
   Widget build(BuildContext context) {
     final c = LatelyColors.of(context);
-    final all = widget.next || widget.wide;
     final items = widget.items;
-    final shown = all
-        ? items
-        : (widget.open ? items.reversed.toList() : items.reversed.take(3).toList());
-    final blanks = widget.open && !all ? 0 : (3 - shown.length - (_adding ? 1 : 0)).clamp(0, 3);
+    // Notes inside a card show every line. Everything else is a fixed-size
+    // tile until you tap See all.
+    final collapsed = !widget.wide && !widget.open;
+    // Next time keeps the order you added things; the others show the latest first.
+    final ordered = widget.next ? items : items.reversed.toList();
+    final List<BlockItem> shown;
+    if (collapsed) {
+      shown = ordered.take(_adding ? _rows - 1 : _rows).toList();
+    } else {
+      shown = ordered;
+    }
+    final blanks = (collapsed || widget.wide)
+        ? (_rows - shown.length - (_adding ? 1 : 0)).clamp(0, _rows)
+        : 0;
+    final canExpand = !widget.wide && items.length > _rows;
 
     return Container(
       key: Key('block-${widget.title}'),
@@ -97,7 +114,7 @@ class _BlockTileState extends State<BlockTile> {
               Expanded(
                 child: Text(widget.title,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ),
               IconButton(
@@ -111,10 +128,13 @@ class _BlockTileState extends State<BlockTile> {
             ]),
           ),
           if (_adding)
-            _AddLine(
-              hint: 'Add to ${widget.title.toLowerCase()}',
-              onAdd: (t) => widget.onAdd?.call(t),
-              onClose: () => setState(() => _adding = false),
+            SizedBox(
+              height: collapsed ? _rowHeight : null,
+              child: _AddLine(
+                hint: 'Add to ${widget.title.toLowerCase()}',
+                onAdd: (t) => widget.onAdd?.call(t),
+                onClose: () => setState(() => _adding = false),
+              ),
             ),
           for (final it in shown)
             SwipeLine(
@@ -122,6 +142,7 @@ class _BlockTileState extends State<BlockTile> {
               id: it.id,
               text: it.text,
               dim: widget.next && it.done,
+              singleLine: collapsed,
               lead: widget.next
                   ? Checkbox(
                       key: Key('check-${it.id}'),
@@ -139,14 +160,23 @@ class _BlockTileState extends State<BlockTile> {
               key: Key('ruled-${widget.title}-$i'),
               onTap: _start,
               child: Container(
-                height: 44,
+                height: _rowHeight,
                 decoration: BoxDecoration(border: Border(top: BorderSide(color: c.line))),
               ),
             ),
-          if (!all && items.length > 3)
-            TextButton(
-              onPressed: () => widget.onOpenChanged(!widget.open),
-              child: Text(widget.open ? 'Show less' : 'See all (${items.length})'),
+          if (!widget.wide)
+            SizedBox(
+              height: _footerHeight,
+              child: canExpand
+                  ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        key: Key('expand-${widget.title}'),
+                        onPressed: () => widget.onOpenChanged(!widget.open),
+                        child: Text(widget.open ? 'Show less' : 'See all (${items.length})'),
+                      ),
+                    )
+                  : null,
             ),
         ],
       ),

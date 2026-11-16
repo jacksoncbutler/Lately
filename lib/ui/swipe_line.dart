@@ -15,6 +15,7 @@ class SwipeLine extends StatefulWidget {
     this.lead,
     this.dim = false,
     this.onTap,
+    this.singleLine = false,
   });
 
   final String id;
@@ -25,6 +26,11 @@ class SwipeLine extends StatefulWidget {
   /// Shown before the text, such as the Next time checkbox.
   final Widget? lead;
   final bool dim;
+
+  /// A fixed-height row: long text is cut off with an ellipsis (the whole line
+  /// shows when you edit it or expand the block). When false the row grows to
+  /// show the whole line.
+  final bool singleLine;
 
   /// When set, tapping the text does this instead of editing in place (used
   /// by Their people, where a tap opens the person's card).
@@ -85,7 +91,9 @@ class _SwipeLineState extends State<SwipeLine> {
 
     if (_editing) {
       return Container(
-        constraints: const BoxConstraints(minHeight: 44),
+        constraints: widget.singleLine
+            ? const BoxConstraints.tightFor(height: 44)
+            : const BoxConstraints(minHeight: 44),
         decoration: BoxDecoration(border: Border(top: BorderSide(color: c.line))),
         child: Row(children: [
           Expanded(
@@ -102,6 +110,9 @@ class _SwipeLineState extends State<SwipeLine> {
                 contentPadding: EdgeInsets.symmetric(vertical: 10),
               ),
               textCapitalization: TextCapitalization.sentences,
+              // A fixed-height row edits on one line; an expanded one can wrap.
+              minLines: 1,
+              maxLines: widget.singleLine ? 1 : 4,
               onEditingComplete: _commit,
             ),
           ),
@@ -131,6 +142,9 @@ class _SwipeLineState extends State<SwipeLine> {
         widget.onDelete();
       },
       child: Container(
+        // A fixed-height row is 44 in all, divider line included, so the blank
+        // ruled rows (also 44) and real lines make the same height.
+        constraints: widget.singleLine ? const BoxConstraints.tightFor(height: 44) : null,
         decoration: BoxDecoration(
           color: c.surface,
           border: Border(top: BorderSide(color: c.line)),
@@ -139,7 +153,7 @@ class _SwipeLineState extends State<SwipeLine> {
           key: Key('line-${widget.id}'),
           onTap: widget.onTap ?? _startEdit,
           child: Container(
-            constraints: const BoxConstraints(minHeight: 44),
+            constraints: widget.singleLine ? null : const BoxConstraints(minHeight: 44),
             child: Row(children: [
               if (widget.lead != null) ...[widget.lead!, const SizedBox(width: 10)],
               Expanded(
@@ -147,6 +161,8 @@ class _SwipeLineState extends State<SwipeLine> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
                     widget.text,
+                    maxLines: widget.singleLine ? 1 : null,
+                    overflow: widget.singleLine ? TextOverflow.ellipsis : null,
                     style: TextStyle(
                       fontSize: 14.5,
                       color: widget.dim ? c.muted : c.ink,

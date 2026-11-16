@@ -137,8 +137,8 @@ class _ProfileBlocksState extends ConsumerState<ProfileBlocks> {
       BlockTile(
         title: 'Next time',
         next: true,
-        open: false,
-        onOpenChanged: (_) {},
+        open: _open.contains('next_time'),
+        onOpenChanged: (v) => setState(() => v ? _open.add('next_time') : _open.remove('next_time')),
         items: linesFor('next_time'),
         onAdd: (text) => _addLine('next_time', text),
         onSave: (lid, text) => repo.updateLine(lid, LinesCompanion(lineText: Value(text))),

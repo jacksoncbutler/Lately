@@ -373,7 +373,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       );
 }
 
-class _HeroCard extends ConsumerWidget {
+class _HeroCard extends ConsumerStatefulWidget {
   const _HeroCard({
     super.key,
     required this.row,
@@ -393,7 +393,24 @@ class _HeroCard extends ConsumerWidget {
   final bool canContact;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HeroCard> createState() => _HeroCardState();
+}
+
+class _HeroCardState extends ConsumerState<_HeroCard> {
+  // Next time shows three lines; See all shows the rest, here on the card.
+  bool _expanded = false;
+
+  @override
+  void didUpdateWidget(_HeroCard old) {
+    super.didUpdateWidget(old);
+    if (old.row.person.id != widget.row.person.id) _expanded = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final row = widget.row;
+    final group = widget.group;
+    final now = widget.now;
     final c = LatelyColors.of(context);
     final t = Theme.of(context).textTheme;
     final p = row.person;
@@ -421,7 +438,7 @@ class _HeroCard extends ConsumerWidget {
                 Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
                   InkWell(
                     key: const Key('hero-name'),
-                    onTap: onOpen,
+                    onTap: widget.onOpen,
                     child: Text(p.name,
                         style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                   ),
@@ -430,7 +447,7 @@ class _HeroCard extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                       decoration:
                           BoxDecoration(color: c.soft, borderRadius: BorderRadius.circular(10)),
-                      child: Text(group!.name,
+                      child: Text(group.name,
                           style: TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600, color: c.muted)),
                     ),
@@ -450,7 +467,7 @@ class _HeroCard extends ConsumerWidget {
             Text('Nothing saved yet. Add things to ask or mention on their profile.',
                 style: t.bodySmall)
           else
-            for (final l in lines.take(3))
+            for (final l in (_expanded ? lines : lines.take(3)))
               CheckboxListTile(
                 key: Key('hero-line-${l.id}'),
                 contentPadding: EdgeInsets.zero,
@@ -464,19 +481,26 @@ class _HeroCard extends ConsumerWidget {
                         color: l.done ? c.muted : null)),
               ),
           if (lines.length > 3)
-            Text('+ ${lines.length - 3} more on their profile', style: t.bodySmall),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('hero-next-toggle'),
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(_expanded ? 'Show less' : 'See all (${lines.length})'),
+              ),
+            ),
           const SizedBox(height: 14),
-          FilledButton(key: const Key('hero-contact'), onPressed: canContact ? onContact : null, child: const Text('Contact')),
+          FilledButton(key: const Key('hero-contact'), onPressed: widget.canContact ? widget.onContact : null, child: const Text('Contact')),
           const SizedBox(height: 8),
-          OutlinedButton(key: const Key('hero-log'), onPressed: onLog, child: const Text('Log')),
+          OutlinedButton(key: const Key('hero-log'), onPressed: widget.onLog, child: const Text('Log')),
           const SizedBox(height: 6),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            TextButton(key: const Key('hero-skip'), style: muted, onPressed: onSkip, child: const Text('Not today')),
+            TextButton(key: const Key('hero-skip'), style: muted, onPressed: widget.onSkip, child: const Text('Not today')),
             Text('·', style: TextStyle(color: c.muted)),
             TextButton(
                 key: const Key('hero-no-answer'),
                 style: muted,
-                onPressed: onNoAnswer,
+                onPressed: widget.onNoAnswer,
                 child: const Text("Didn't answer")),
           ]),
         ]),

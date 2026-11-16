@@ -138,7 +138,7 @@ void main() {
       expect(heroName('Awake'), findsOneWidget);
     });
 
-    testApp('Next time shows up to three open lines, and how many more are on the profile', (tester) async {
+    testApp('Next time shows three open lines, and See all expands it on the card', (tester) async {
       final id = await add('Sam', daysAgo: 51);
       for (final t in ['one', 'two', 'three', 'four', 'five']) {
         await repo.createLine(personId: id, block: 'next_time', text: t);
@@ -147,7 +147,59 @@ void main() {
       expect(find.text('one'), findsOneWidget);
       expect(find.text('three'), findsOneWidget);
       expect(find.text('four'), findsNothing);
-      expect(find.text('+ 2 more on their profile'), findsOneWidget);
+      expect(find.text('See all (5)'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('hero-next-toggle')));
+      await tester.pumpAndSettle();
+      for (final t in ['one', 'two', 'three', 'four', 'five']) {
+        expect(find.text(t), findsOneWidget, reason: t);
+      }
+      expect(find.text('Show less'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('hero-next-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('four'), findsNothing);
+      expect(find.text('See all (5)'), findsOneWidget);
+    });
+
+    testApp('with three or fewer lines there is nothing to expand', (tester) async {
+      final id = await add('Sam', daysAgo: 51);
+      for (final t in ['one', 'two', 'three']) {
+        await repo.createLine(personId: id, block: 'next_time', text: t);
+      }
+      await pumpHome(tester);
+      expect(find.byKey(const Key('hero-next-toggle')), findsNothing);
+    });
+
+    testApp('a line in the expanded list can be ticked like any other', (tester) async {
+      final id = await add('Sam', daysAgo: 51);
+      final ids = <String>[];
+      for (final t in ['one', 'two', 'three', 'four']) {
+        ids.add(await repo.createLine(personId: id, block: 'next_time', text: t));
+      }
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('hero-next-toggle')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('hero-line-${ids[3]}')));
+      await settle(tester);
+      expect((await repo.linesFor(id)).firstWhere((l) => l.id == ids[3]).done, isTrue);
+      expect(find.text('four'), findsOneWidget); // still listed, ticked
+    });
+
+    testApp('the next person starts collapsed again', (tester) async {
+      final sam = await add('Sam', daysAgo: 60);
+      final bo = await add('Bo', daysAgo: 40);
+      for (final t in ['a1', 'a2', 'a3', 'a4']) {
+        await repo.createLine(personId: sam, block: 'next_time', text: t);
+        await repo.createLine(personId: bo, block: 'next_time', text: t.replaceFirst('a', 'b'));
+      }
+      await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('hero-next-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('a4'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('hero-skip')));
+      await settle(tester);
+      expect(heroName('Bo'), findsOneWidget);
+      expect(find.text('b4'), findsNothing); // collapsed for the new person
+      expect(find.text('See all (4)'), findsOneWidget);
     });
 
     testApp('with nothing saved, it says how to add things', (tester) async {

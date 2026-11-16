@@ -71,3 +71,8 @@ CI and release builds pin Flutter 3.47.9 (`flutter-version` in `.github/workflow
 - `lib/data/phone_launcher.dart` now sits on an `AppOpener` (explicit-app intents on Android through android_intent_plus, else a link), so the order of steps (for example the Instagram start-then-DM sequence) is tested without a phone (`test/launcher_test.dart`). The Instagram warm-up delay is `instagramWarmup` (1.5 s): tune it, or remove the warm-up, if the DM opens reliably without it.
 - `lib/domain/social.dart`: Facebook username, id and link parsing, the open-profile and Messenger links, and `migrateSocials` (used once by the schema 5 upgrade).
 - `showUndoBar` sets `persist: false` and a 3 second duration. Do not remove `persist: false`: without it Flutter keeps a snack bar that has an action on screen indefinitely.
+
+## Version 0.10.1 notes
+
+- `BlockTile` and `SwipeLine(singleLine: true)` keep collapsed blocks to a fixed height. A real line, a ruled blank row and the add field are all exactly 44 including the divider line; if you change one, keep the others equal (the test `blocks keep a fixed size until you tap See all` checks it).
+- `lib/app_orientation.dart` locks to portrait; the Android manifest lock is `android:screenOrientation="portrait"`. Android may ignore orientation locks on large screens on the newest versions, which is fine for now.
