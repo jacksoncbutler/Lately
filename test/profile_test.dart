@@ -301,25 +301,68 @@ void main() {
       expect(find.text('One'), findsNothing);
     });
 
-    testApp('Next time shows the first three, oldest first, and See all shows the rest', (tester) async {
-      for (final t in ['one', 'two', 'three', 'four', 'five']) {
+    testApp('Next time shows up to six lines, oldest first; See all shows the rest', (tester) async {
+      final all = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+      for (final t in all) {
         await addNextTime(t);
       }
       await openProfile(tester);
-      for (final t in ['one', 'two', 'three']) {
-        expect(find.text(t), findsOneWidget);
+      for (final t in all.take(6)) {
+        expect(find.text(t), findsOneWidget, reason: t);
       }
-      expect(find.text('four'), findsNothing);
-      expect(tester.getTopLeft(find.text('one')).dy, lessThan(tester.getTopLeft(find.text('three')).dy));
+      expect(find.text('seven'), findsNothing);
+      expect(tester.getTopLeft(find.text('one')).dy, lessThan(tester.getTopLeft(find.text('six')).dy));
+      expect(find.text('See all (8)'), findsOneWidget);
       await tester.tap(find.byKey(const Key('expand-Next time')));
       await tester.pumpAndSettle();
-      for (final t in ['four', 'five']) {
+      for (final t in ['seven', 'eight']) {
         expect(find.text(t), findsOneWidget);
       }
-      expect(tester.getTopLeft(find.text('one')).dy, lessThan(tester.getTopLeft(find.text('five')).dy));
       await tester.tap(find.byKey(const Key('expand-Next time')));
       await tester.pumpAndSettle();
-      expect(find.text('five'), findsNothing);
+      expect(find.text('eight'), findsNothing);
+    });
+
+    testApp('with six or fewer lines there is no See all', (tester) async {
+      for (final t in ['one', 'two', 'three', 'four', 'five', 'six']) {
+        await addNextTime(t);
+      }
+      await openProfile(tester);
+      expect(find.byKey(const Key('expand-Next time')), findsNothing);
+      expect(find.text('six'), findsOneWidget);
+    });
+
+    testApp('Next time grows a row at a time to six, then stops', (tester) async {
+      await openProfile(tester);
+      double h() => tester.getSize(find.byKey(const Key('block-Next time'))).height;
+      final empty = h(); // header and three ruled rows
+      final heights = <double>[];
+      for (var i = 1; i <= 8; i++) {
+        await addNextTime('line $i');
+        await settle(tester);
+        heights.add(h());
+      }
+      // 1 to 3 lines: no change (they fill the ruled rows).
+      expect(heights.take(3), everyElement(empty));
+      // 4, 5, 6 lines: one 44-point row each.
+      expect(heights[3], empty + 44);
+      expect(heights[4], empty + 88);
+      expect(heights[5], empty + 132);
+      // 7 and 8 lines: no more rows, only the See all row appears.
+      expect(heights[6], empty + 132 + 48);
+      expect(heights[7], heights[6]);
+    });
+
+    testApp('adding to a full Next time does not make it taller', (tester) async {
+      for (var i = 1; i <= 7; i++) {
+        await addNextTime('line $i');
+      }
+      await openProfile(tester);
+      final before = tester.getSize(find.byKey(const Key('block-Next time'))).height;
+      await tester.tap(find.byKey(const Key('add-Next time')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-field')), findsOneWidget);
+      expect(tester.getSize(find.byKey(const Key('block-Next time'))).height, before);
     });
   });
 
@@ -332,22 +375,22 @@ void main() {
       await repo.createLine(personId: sam, block: 'about', text: long);
       await repo.createLine(personId: sam, block: 'about', text: long);
       await repo.createLine(personId: sam, block: 'interests', text: 'Chess');
-      await addNextTime(long);
       await openProfile(tester);
       final empty = heightOf(tester, 'Their people'); // nothing in it
       expect(heightOf(tester, 'Interests'), empty); // one short line
       expect(heightOf(tester, 'About'), empty); // three very long lines
-      expect(heightOf(tester, 'Next time'), empty); // full width, same height
     });
 
     testApp('a long line is cut off with an ellipsis instead of wrapping', (tester) async {
       await repo.createLine(personId: sam, block: 'about', text: long);
+      await addNextTime(long);
       await openProfile(tester);
-      final text = tester.widget<Text>(find.descendant(of: find.byKey(const Key('block-About')), matching: find.text(long)));
-      expect(text.maxLines, 1);
-      expect(text.overflow, TextOverflow.ellipsis);
+      for (final b in ['About', 'Next time']) {
+        final text = tester.widget<Text>(find.descendant(of: find.byKey(Key('block-$b')), matching: find.text(long)));
+        expect(text.maxLines, 1, reason: b);
+        expect(text.overflow, TextOverflow.ellipsis, reason: b);
+      }
     });
-
     testApp('more than three lines does not grow the block, because the See all row is always reserved', (tester) async {
       await openProfile(tester);
       final before = heightOf(tester, 'Interests');
@@ -420,8 +463,8 @@ void main() {
       expect(h, heightOf(tester, 'Interests'));
     });
 
-    testApp('the log popup uses the same fixed sizes', (tester) async {
-      for (final t in ['one', 'two', 'three', 'four']) {
+    testApp('the log popup uses the same sizes', (tester) async {
+      for (final t in ['one', 'two', 'three', 'four', 'five', 'six', 'seven']) {
         await addNextTime(t);
       }
       await openProfile(tester);

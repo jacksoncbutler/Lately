@@ -64,8 +64,10 @@ class _BlockTileState extends State<BlockTile> {
   bool _adding = false;
 
   /// Rows shown while a block is collapsed. Every collapsed block is the same
-  /// height whatever it holds: header, these rows, and a footer row.
+  /// height whatever it holds: header, these rows, and a footer row. Next time
+  /// is full width, so it can grow to [_nextRows] before hiding the rest.
   static const _rows = 3;
+  static const _nextRows = 6;
   static const _rowHeight = 44.0;
   static const _footerHeight = 48.0;
 
@@ -86,16 +88,21 @@ class _BlockTileState extends State<BlockTile> {
     final collapsed = !widget.wide && !widget.open;
     // Next time keeps the order you added things; the others show the latest first.
     final ordered = widget.next ? items : items.reversed.toList();
+    final capacity = widget.next ? _nextRows : _rows;
     final List<BlockItem> shown;
     if (collapsed) {
-      shown = ordered.take(_adding ? _rows - 1 : _rows).toList();
+      shown = ordered.take(_adding ? capacity - 1 : capacity).toList();
     } else {
       shown = ordered;
     }
+    // Blank ruled rows keep an empty or nearly empty block three rows tall.
     final blanks = (collapsed || widget.wide)
         ? (_rows - shown.length - (_adding ? 1 : 0)).clamp(0, _rows)
         : 0;
-    final canExpand = !widget.wide && items.length > _rows;
+    final canExpand = !widget.wide && items.length > capacity;
+    // Next time grows with what it holds, so it only reserves the See all row
+    // when there is something to see.
+    final reserveFooter = !widget.wide && (!widget.next || canExpand || widget.open);
 
     return Container(
       key: Key('block-${widget.title}'),
@@ -164,7 +171,7 @@ class _BlockTileState extends State<BlockTile> {
                 decoration: BoxDecoration(border: Border(top: BorderSide(color: c.line))),
               ),
             ),
-          if (!widget.wide)
+          if (reserveFooter)
             SizedBox(
               height: _footerHeight,
               child: canExpand
