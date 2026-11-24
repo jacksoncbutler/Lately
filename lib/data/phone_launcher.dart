@@ -14,7 +14,6 @@ abstract class PhoneLauncher {
 
   /// [digits] is the international number without the plus.
   Future<bool> whatsapp(String digits);
-  Future<bool> instagramDm(String username);
   Future<bool> instagramProfile(String username);
 
   /// A Messenger chat; [token] is a Facebook username or numeric id.
@@ -66,18 +65,9 @@ const messengerPackage = 'com.facebook.orca';
 const facebookPackage = 'com.facebook.katana';
 
 class DevicePhoneLauncher implements PhoneLauncher {
-  DevicePhoneLauncher({
-    AppOpener? opener,
-    Future<void> Function(Duration)? wait,
-    this.instagramWarmup = const Duration(milliseconds: 1500),
-  })  : _o = opener ?? DeviceAppOpener(),
-        _wait = wait ?? Future<void>.delayed;
+  DevicePhoneLauncher({AppOpener? opener}) : _o = opener ?? DeviceAppOpener();
 
   final AppOpener _o;
-  final Future<void> Function(Duration) _wait;
-
-  /// How long Instagram gets to start before the DM link is sent to it.
-  final Duration instagramWarmup;
 
   @override
   Future<bool> call(String number) => _o.url(Uri(scheme: 'tel', path: number).toString(), platformDefault: true);
@@ -95,19 +85,6 @@ class DevicePhoneLauncher implements PhoneLauncher {
     if (await _o.intent('https://instagram.com/_u/$username', instagramPackage)) return true;
     if (await _o.url('instagram://user?username=$username')) return true;
     return _o.url('https://www.instagram.com/$username/');
-  }
-
-  // Instagram drops a deep link that arrives while it is still starting up, so
-  // the DM only opened if the app was already running. Start it first (on the
-  // profile), give it a moment, then send the DM link to the running app.
-  @override
-  Future<bool> instagramDm(String username) async {
-    final dm = 'https://ig.me/m/$username';
-    if (await _o.intent('https://instagram.com/_u/$username', instagramPackage)) {
-      await _wait(instagramWarmup);
-      if (await _o.intent(dm, instagramPackage)) return true;
-    }
-    return _o.url(dm);
   }
 
   @override

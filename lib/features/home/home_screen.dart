@@ -9,6 +9,7 @@ import '../../data/repository.dart';
 import '../../domain/chat_rules.dart';
 import '../../domain/constants.dart';
 import '../../domain/profile_format.dart';
+import '../../domain/people_filter.dart';
 import '../../domain/ranking.dart';
 import '../../domain/timezones.dart';
 import '../../ui/log_fab.dart';
@@ -180,7 +181,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                         rows: rows,
                         settings: rs,
                         now: now,
-                        onBrowse: _browse,
                       ),
                     if (hero.note.isNotEmpty)
                       Padding(
@@ -242,14 +242,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           ]),
                         ),
                       ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        key: const Key('browse-everyone'),
-                        onPressed: _browse,
-                        child: const Text('Browse everyone'),
-                      ),
-                    ),
                   ],
                 ),
     );
@@ -516,12 +508,10 @@ class _CaughtUpCard extends StatelessWidget {
     required this.rows,
     required this.settings,
     required this.now,
-    required this.onBrowse,
   });
   final List<RankRow> rows;
   final RankSettings settings;
   final DateTime now;
-  final VoidCallback onBrowse;
 
   @override
   Widget build(BuildContext context) {
@@ -530,10 +520,10 @@ class _CaughtUpCard extends StatelessWidget {
     // pick up later.
     final waiting = <({String name, int minutes, bool tried})>[
       for (final r in rows)
-        if (r.status == PersonStatus.asleep)
+        if (r.status == PersonStatus.asleep && isDue(r))
           (name: r.person.name, minutes: wakeInMinutes(r.person, now, settings), tried: false),
       for (final r in rows)
-        if (r.status == PersonStatus.retryLater && r.returnsAt != null)
+        if (r.status == PersonStatus.retryLater && r.returnsAt != null && isDue(r))
           (name: r.person.name, minutes: r.returnsAt!.difference(now).inMinutes.clamp(1, 100000), tried: true),
     ]..sort((a, b) => a.minutes.compareTo(b.minutes));
     final skipped = rows.any((r) => r.status == PersonStatus.skipped);
@@ -550,7 +540,7 @@ class _CaughtUpCard extends StatelessWidget {
       body = 'Everyone left is skipped or paused. Skipped people come back tomorrow.';
     } else if (calm) {
       title = "You're caught up";
-      body = 'Nobody is due right now. Enjoy the quiet, or browse everyone.';
+      body = 'Nobody is due right now. Enjoy the quiet.';
     } else {
       title = 'Nobody to suggest';
       body = 'Everyone is paused or skipped for today.';
@@ -566,7 +556,6 @@ class _CaughtUpCard extends StatelessWidget {
           Text(title, key: const Key('caught-up-title'), style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           Text(body, key: const Key('caught-up-body'), style: t.bodyMedium),
-          TextButton(onPressed: onBrowse, child: const Text('Browse everyone')),
         ]),
       ),
     );

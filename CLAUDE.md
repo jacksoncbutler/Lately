@@ -9,7 +9,7 @@ Lately is a personal, offline, device-only mobile app that ranks who to talk to 
 4. `reference/`: `logic.js` + `test.js` (ranking rules, ported first, keep the tests), `prototype/lately-prototype.html` (open in a browser; behaviour of record for anything the docs leave open). Run the logic tests with `node test.js` inside `reference/` (prints "all passed").
 
 ## Status
-All nine build steps are done (0.11.0). Android is first; iPhone is a separate later step (see `docs/RELEASING.md`). New work is feature requests and polish, each still ending in something to install and check on the Pixel.
+All nine build steps are done (0.12.0). Android is first; iPhone is a separate later step (see `docs/RELEASING.md`). New work is feature requests and polish, each still ending in something to install and check on the Pixel.
 
 ## Working method
 - Follow the nine steps in "Build order" in the technical plan, one at a time. Each step ends with something Jackson can install on his Pixel 7a (GrapheneOS) and check. Do not start the next step before that.

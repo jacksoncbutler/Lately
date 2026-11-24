@@ -52,7 +52,7 @@ void main() {
 
     test('what Contact opens', () {
       expect(channelTarget(Channel.facebook), 'Facebook Messenger');
-      expect(channelTarget(Channel.instagram), 'an Instagram DM');
+      expect(channelTarget(Channel.instagram), 'their Instagram profile');
       expect(channelTarget(Channel.whatsapp), 'WhatsApp');
     });
 

@@ -120,7 +120,7 @@ void main() {
     testApp('Browse everyone on Home goes to People', (tester) async {
       await add('Sam', daysAgo: 60);
       await pumpApp(tester);
-      await tester.tap(find.byKey(const Key('browse-everyone')));
+      await tester.tap(find.byKey(const Key('tab-people')));
       await settle(tester);
       expect(find.byKey(const Key('people-search')), findsOneWidget);
     });

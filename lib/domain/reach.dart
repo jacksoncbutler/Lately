@@ -41,7 +41,7 @@ String channelLabel(Channel c) {
 String channelTarget(Channel c) {
   switch (c) {
     case Channel.instagram:
-      return 'an Instagram DM';
+      return 'their Instagram profile';
     case Channel.facebook:
       return 'Facebook Messenger';
     default:

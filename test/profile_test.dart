@@ -984,12 +984,12 @@ void main() {
       expect(launcher.calls, ['whatsapp:351912345678']); // Lisbon: +351
     });
 
-    testApp('Instagram opens the DM', (tester) async {
+    testApp('Instagram opens their profile', (tester) async {
       await prefer('instagram', instagram: 'sam.r');
       await openProfile(tester);
       await tester.tap(find.byKey(const Key('profile-contact')));
       await settle(tester);
-      expect(launcher.calls, ['ig-dm:sam.r']);
+      expect(launcher.calls, ['ig-profile:sam.r']);
     });
 
     testApp('Facebook as the contact opens a Messenger chat', (tester) async {

@@ -18,7 +18,6 @@ class FakeLauncher implements PhoneLauncher {
   @override
   Future<bool> whatsapp(String digits) => _rec('whatsapp:$digits');
   @override
-  Future<bool> instagramDm(String username) => _rec('ig-dm:$username');
   @override
   Future<bool> instagramProfile(String username) => _rec('ig-profile:$username');
   @override

@@ -293,7 +293,7 @@ void main() {
       await pumpHome(tester);
       expect(find.byKey(const Key('hero-card')), findsNothing);
       expect(text(tester, 'caught-up-title'), "You're caught up");
-      expect(text(tester, 'caught-up-body'), 'Nobody is due right now. Enjoy the quiet, or browse everyone.');
+      expect(text(tester, 'caught-up-body'), 'Nobody is due right now. Enjoy the quiet.');
     });
 
     testApp('everyone you could talk to is asleep: who wakes first, and in how long', (tester) async {
@@ -312,13 +312,26 @@ void main() {
       expect(text(tester, 'caught-up-body'), 'Everyone is paused or skipped for today.');
     });
 
-    testApp('Browse everyone opens the people list from the card', (tester) async {
+    testApp('the caught-up card has no Browse everyone button, and neither does Home', (tester) async {
       await add('Sam', daysAgo: 3);
       await pumpHome(tester);
-      await tester.tap(find.descendant(of: find.byKey(const Key('caught-up-card')), matching: find.text('Browse everyone')));
-      await settle(tester);
-      expect(find.text('People'), findsWidgets);
+      expect(find.text('Browse everyone'), findsNothing);
+      expect(find.byKey(const Key('browse-everyone')), findsNothing);
     });
+
+    testApp('asleep but not due is "caught up", never "Nobody is free right now"', (tester) async {
+      await add('Jun', zone: 'Asia/Tokyo', daysAgo: 3); // asleep there, but talked to recently
+      await pumpHome(tester);
+      expect(text(tester, 'caught-up-title'), "You're caught up");
+    });
+
+    testApp('a due person who is asleep still says nobody is free, even with a not-due person awake', (tester) async {
+      await add('Jun', zone: 'Asia/Tokyo', daysAgo: 80);
+      await add('Sam', daysAgo: 3);
+      await pumpHome(tester);
+      expect(text(tester, 'caught-up-title'), 'Nobody is free right now');
+    });
+  });
   });
 
   group('Not today', () {

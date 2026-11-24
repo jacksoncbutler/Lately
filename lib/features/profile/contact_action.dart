@@ -48,7 +48,7 @@ Future<bool> launchChannel(WidgetRef ref, PersonRow person, Channel c, {bool dm 
     case Channel.instagram:
       final u = instagramUsername(r.instagram);
       if (u == null) return false;
-      return dm ? launcher.instagramDm(u) : launcher.instagramProfile(u);
+      return launcher.instagramProfile(u); // Contact and the row both open the profile
     case Channel.facebook:
       final f = facebookToken(r.facebook);
       if (f == null) return false;

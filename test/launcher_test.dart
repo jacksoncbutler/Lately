@@ -23,39 +23,10 @@ class _Opener implements AppOpener {
 
 void main() {
   late _Opener opener;
-  late List<Duration> waits;
   DevicePhoneLauncher make(_Opener o) {
-    waits = [];
     opener = o;
-    return DevicePhoneLauncher(opener: o, wait: (d) async => waits.add(d), instagramWarmup: const Duration(milliseconds: 1500));
+    return DevicePhoneLauncher(opener: o);
   }
-
-  group('Instagram DM', () {
-    test('starts Instagram first, waits, then sends the DM to the running app', () async {
-      final l = make(_Opener(installed: {instagramPackage}));
-      expect(await l.instagramDm('sam.r'), isTrue);
-      expect(opener.steps, [
-        'intent:$instagramPackage:https://instagram.com/_u/sam.r',
-        'intent:$instagramPackage:https://ig.me/m/sam.r',
-      ]);
-      expect(waits, [const Duration(milliseconds: 1500)]); // the wait happens between the two
-    });
-
-    test('with no Instagram app it falls back to the web link, with no waiting', () async {
-      final l = make(_Opener());
-      expect(await l.instagramDm('sam.r'), isTrue);
-      expect(opener.steps, [
-        'intent:$instagramPackage:https://instagram.com/_u/sam.r',
-        'url:https://ig.me/m/sam.r',
-      ]);
-      expect(waits, isEmpty);
-    });
-
-    test('says false when nothing could open it', () async {
-      final l = make(_Opener(urlWorks: false));
-      expect(await l.instagramDm('sam.r'), isFalse);
-    });
-  });
 
   group('profiles', () {
     test('Instagram profile goes to the app first, then its link, then the web page', () async {
@@ -90,7 +61,6 @@ void main() {
       var l = make(_Opener(installed: {messengerPackage}));
       expect(await l.messenger('sam.rodrigues'), isTrue);
       expect(opener.steps, ['intent:$messengerPackage:https://m.me/sam.rodrigues']);
-      expect(waits, isEmpty);
       l = make(_Opener());
       await l.messenger('sam.rodrigues');
       expect(opener.steps.last, 'url:https://m.me/sam.rodrigues');

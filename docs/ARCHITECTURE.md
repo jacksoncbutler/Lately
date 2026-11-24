@@ -68,7 +68,7 @@ CI and release builds pin Flutter 3.47.9 (`flutter-version` in `.github/workflow
 
 ## Version 0.10 notes
 
-- `lib/data/phone_launcher.dart` now sits on an `AppOpener` (explicit-app intents on Android through android_intent_plus, else a link), so the order of steps (for example the Instagram start-then-DM sequence) is tested without a phone (`test/launcher_test.dart`). The Instagram warm-up delay is `instagramWarmup` (1.5 s): tune it, or remove the warm-up, if the DM opens reliably without it.
+- `lib/data/phone_launcher.dart` now sits on an `AppOpener` (explicit-app intents on Android through android_intent_plus, else a link), so the order of steps (app first, then link) is tested without a phone (`test/launcher_test.dart`). Instagram has no DM sequence: Contact opens the person's profile, one tap from a message.
 - `lib/domain/social.dart`: Facebook username, id and link parsing, the open-profile and Messenger links, and `migrateSocials` (used once by the schema 5 upgrade).
 - `showUndoBar` sets `persist: false` and a 3 second duration. Do not remove `persist: false`: without it Flutter keeps a snack bar that has an action on screen indefinitely.
 

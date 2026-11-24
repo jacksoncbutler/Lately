@@ -5,6 +5,7 @@ import '../../data/database.dart';
 import '../../data/providers.dart';
 import '../../data/repository.dart';
 import '../../domain/chat_rules.dart';
+import '../../domain/people_filter.dart';
 import '../../domain/ranking.dart';
 import '../../domain/timezones.dart';
 import '../../ui/add_people_menu.dart';
@@ -56,6 +57,7 @@ class _ArchivedToggle extends _Item {
 class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   String _query = '';
   bool _archivedOpen = false;
+  PeopleFilter _filter = const PeopleFilter();
 
   @override
   Widget build(BuildContext context) {
@@ -80,8 +82,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
     final q = _query.trim().toLowerCase();
     bool match(PersonRow p) => q.isEmpty || p.displayName.toLowerCase().contains(q);
-    final shown = people.where(match).toList();
-    final shownArchived = archived.where(match).toList();
+    bool inGroup(PersonRow p) => _filter.groupId == null || p.groupId == _filter.groupId;
+    final shown = people.where((p) => match(p) && inGroup(p)).toList();
+    final shownArchived = archived.where((p) => match(p) && inGroup(p)).toList();
+    final settingsReady = settings != null && zone != null;
 
     // Longest since you talked first; people still to finish go last.
     int byDays(PersonRow a, PersonRow b) {
@@ -93,12 +97,39 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     }
 
     final items = <_Item>[];
-    for (final g in groups) {
-      final members = shown.where((p) => p.groupId == g.id).toList()..sort(byDays);
-      if (members.isEmpty) continue;
-      items.add(_Header('${g.name} · every ${g.defaultIntervalDays} days'));
+    void addRun(List<PersonRow> members) {
       for (var i = 0; i < members.length; i++) {
         items.add(_PersonItem(members[i], first: i == 0, last: i == members.length - 1));
+      }
+    }
+
+    if (_filter.prioritised && settingsReady) {
+      final rs = rankSettingsFrom(settings, zone);
+      final buckets = {for (final n in prioritySections(_filter)) n: <PersonRow>[]};
+      final unfinished = <PersonRow>[];
+      for (final p in shown) {
+        final r = rows[p.id];
+        if (r == null || needsFinishing(p)) {
+          unfinished.add(p);
+          continue;
+        }
+        buckets[prioritySection(_filter, awake: isAwakeNow(p.timezone, now, rs), due: isDue(r))]!.add(p);
+      }
+      for (final e in buckets.entries) {
+        if (e.value.isEmpty) continue;
+        items.add(_Header(e.key));
+        addRun(e.value..sort(byDays));
+      }
+      if (unfinished.isNotEmpty) {
+        items.add(_Header('Finish setup'));
+        addRun(unfinished..sort(byDays));
+      }
+    } else {
+      for (final g in groups) {
+        final members = shown.where((p) => p.groupId == g.id).toList()..sort(byDays);
+        if (members.isEmpty) continue;
+        items.add(_Header('${g.name} · every ${g.defaultIntervalDays} days'));
+        addRun(members);
       }
     }
     if (shownArchived.isNotEmpty) {
@@ -114,11 +145,14 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       final isArchived = p.archivedAt != null;
       final r = rows[p.id];
       final unfinished = needsFinishing(p) && !isArchived;
+      final groupName = _filter.prioritised && !isArchived
+          ? groups.where((g) => g.id == p.groupId).map((g) => g.name).firstOrNull
+          : null;
       final sub = isArchived
           ? 'Archived'
           : unfinished
               ? 'Finish setup to get suggestions'
-              : '${r == null ? '' : 'Last talked ${agoText(r.days)} · '}${clockText(p.timezone, now)} there';
+              : '${groupName == null ? '' : '$groupName · '}${r == null ? '' : 'Last talked ${agoText(r.days)} · '}${clockText(p.timezone, now)} there';
       final status = (r == null || unfinished || isArchived) ? null : _statusLabels[r.status];
       return ListTile(
         key: Key('person-${p.id}'),
@@ -146,16 +180,53 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       floatingActionButton: people.isEmpty ? null : const LogFab(),
       body: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
-          child: TextField(
-            key: const Key('people-search'),
-            decoration: const InputDecoration(
-              hintText: 'Search people',
-              prefixIcon: Icon(Icons.search),
+          padding: const EdgeInsets.fromLTRB(18, 0, 8, 4),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                key: const Key('people-search'),
+                decoration: const InputDecoration(
+                  hintText: 'Search people',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (v) => setState(() => _query = v),
+              ),
             ),
-            onChanged: (v) => setState(() => _query = v),
-          ),
+            IconButton(
+              key: const Key('people-filter'),
+              tooltip: 'Filter',
+              icon: Icon(_filter.isActive ? Icons.filter_alt : Icons.filter_alt_outlined),
+              onPressed: () => _openFilter(context, groups),
+            ),
+          ]),
         ),
+        if (_filter.isActive)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
+              child: Wrap(spacing: 8, children: [
+                if (_filter.awakeFirst)
+                  InputChip(
+                    key: const Key('chip-awake'),
+                    label: const Text('Awake first'),
+                    onDeleted: () => setState(() => _filter = _filter.copyWith(awakeFirst: false)),
+                  ),
+                if (_filter.dueFirst)
+                  InputChip(
+                    key: const Key('chip-due'),
+                    label: const Text('Due first'),
+                    onDeleted: () => setState(() => _filter = _filter.copyWith(dueFirst: false)),
+                  ),
+                if (_filter.groupId != null)
+                  InputChip(
+                    key: const Key('chip-group'),
+                    label: Text(groups.where((g) => g.id == _filter.groupId).map((g) => g.name).firstOrNull ?? 'Group'),
+                    onDeleted: () => setState(() => _filter = _filter.copyWith(clearGroup: true)),
+                  ),
+              ]),
+            ),
+          ),
         Expanded(
           child: items.isEmpty
               ? Padding(
@@ -164,7 +235,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                     alignment: Alignment.topCenter,
                     child: Text(people.isEmpty && archived.isEmpty
                         ? 'No one yet. Tap + to add people.'
-                        : 'No one matches that search.'),
+                        : (_filter.isActive && q.isEmpty ? 'No one matches those filters.' : 'No one matches that search.')),
                   ),
                 )
               : ListView.builder(
@@ -202,6 +273,67 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                 ),
         ),
       ]),
+    );
+  }
+
+  Future<void> _openFilter(BuildContext context, List<GroupRow> groups) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
+        void change(PeopleFilter f) {
+          setState(() => _filter = f);
+          setSheet(() {});
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text('Show first', style: Theme.of(ctx).textTheme.titleMedium),
+            SwitchListTile(
+              key: const Key('filter-awake'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Awake'),
+              value: _filter.awakeFirst,
+              onChanged: (v) => change(_filter.copyWith(awakeFirst: v)),
+            ),
+            SwitchListTile(
+              key: const Key('filter-due'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Due'),
+              value: _filter.dueFirst,
+              onChanged: (v) => change(_filter.copyWith(dueFirst: v)),
+            ),
+            const SizedBox(height: 8),
+            Text('Only show', style: Theme.of(ctx).textTheme.titleMedium),
+            Wrap(spacing: 8, children: [
+              ChoiceChip(
+                key: const Key('filter-group-all'),
+                label: const Text('All'),
+                selected: _filter.groupId == null,
+                onSelected: (_) => change(_filter.copyWith(clearGroup: true)),
+              ),
+              for (final g in groups)
+                ChoiceChip(
+                  key: Key('filter-group-${g.id}'),
+                  label: Text(g.name),
+                  selected: _filter.groupId == g.id,
+                  onSelected: (_) => change(_filter.copyWith(groupId: g.id)),
+                ),
+            ]),
+            const SizedBox(height: 8),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              TextButton(
+                key: const Key('filter-clear'),
+                onPressed: _filter.isActive ? () => change(const PeopleFilter()) : null,
+                child: const Text('Clear'),
+              ),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Done')),
+            ]),
+          ]),
+        );
+      }),
     );
   }
 

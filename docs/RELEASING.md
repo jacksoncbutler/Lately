@@ -6,7 +6,7 @@ How a build gets from this repository to the phone, and what to check each time.
 
 1. `flutter analyze` is clean and `flutter test` is green (the CI run on the branch shows both, plus a debug Android build).
 2. `node test.js` inside `reference/` still prints "all passed" (the prototype's rules, which `lib/domain/ranking.dart` is ported from).
-3. The version is bumped in **both** places: `version:` in `pubspec.yaml` (`0.11.0+14`: the part after `+` is the build number and must go up every build, or Android refuses to install over the old one) and `appVersion` in `lib/app_config.dart` (a test keeps them equal).
+3. The version is bumped in **both** places: `version:` in `pubspec.yaml` (`0.12.0+15`: the part after `+` is the build number and must go up every build, or Android refuses to install over the old one) and `appVersion` in `lib/app_config.dart` (a test keeps them equal).
 4. Anything that changes the database bumps `currentSchemaVersion` in `lib/data/database.dart`, adds an upgrade step (never edit old ones), and extends `test/safe_open_test.dart`.
 5. Anything that changes the backup file adds optional fields only, bumps `backupMinor` in `lib/app_config.dart`, and gets a new sample file in `test/fixtures` (`dart run tool/make_fixtures.dart`). Old fixtures are never edited or deleted.
 
