@@ -332,7 +332,6 @@ void main() {
       expect(text(tester, 'caught-up-title'), 'Nobody is free right now');
     });
   });
-  });
 
   group('Not today', () {
     testApp('Not today hides them until local midnight, with Undo, and shows the next person', (tester) async {
