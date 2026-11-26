@@ -416,7 +416,11 @@ class _HeroCardState extends ConsumerState<_HeroCard> {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
+          InkWell(
+            key: const Key('hero-header'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: widget.onOpen,
+            child: Row(children: [
             CircleAvatar(
               radius: 28,
               backgroundColor: c.accent,
@@ -428,9 +432,9 @@ class _HeroCardState extends ConsumerState<_HeroCard> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
-                  InkWell(
+                  Padding(
                     key: const Key('hero-name'),
-                    onTap: widget.onOpen,
+                    padding: EdgeInsets.zero,
                     child: Text(p.name,
                         style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                   ),
@@ -449,6 +453,7 @@ class _HeroCardState extends ConsumerState<_HeroCard> {
               ]),
             ),
           ]),
+          ),
           const SizedBox(height: 14),
           Text(whyLine(row), key: const Key('hero-why'), style: const TextStyle(fontWeight: FontWeight.w500)),
           const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),

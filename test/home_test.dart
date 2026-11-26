@@ -236,6 +236,18 @@ void main() {
       expect(find.byKey(const Key('profile-contact')), findsOneWidget);
     });
 
+    testApp('anywhere on the top banner opens their profile: the picture and the clock line too', (tester) async {
+      await add('Sam', daysAgo: 51);
+      await pumpHome(tester);
+      for (final target in [find.byType(CircleAvatar), find.byKey(const Key('hero-clock'))]) {
+        await tester.tap(target.first);
+        await settle(tester);
+        expect(find.byKey(const Key('profile-contact')), findsOneWidget);
+        await tester.pageBack();
+        await settle(tester);
+      }
+    });
+
     testApp('Contact opens straight to their preferred app and Log opens the popup on the same person', (tester) async {
       await add('Sam', daysAgo: 51);
       await pumpHome(tester);
