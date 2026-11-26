@@ -51,11 +51,12 @@ void main() {
 
   setUpAll(ensureTimezonesLoaded);
 
-  setUp(() {
+  setUp(() async {
     db = LatelyDatabase(NativeDatabase.memory());
     repo = Repository(db, clock: () => fixedNow);
     tmp = Directory.systemTemp.createTempSync('lately_flow_test');
     contacts = FakeContacts(ContactsAccess.granted);
+    await repo.completeSetup();
   });
   tearDown(() => tmp.deleteSync(recursive: true));
 

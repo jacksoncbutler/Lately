@@ -243,7 +243,7 @@ void main() {
         await tester.tap(target.first);
         await settle(tester);
         expect(find.byKey(const Key('profile-contact')), findsOneWidget);
-        await tester.pageBack();
+        await tester.tap(find.text('Home')); // the profile's back label
         await settle(tester);
       }
     });
