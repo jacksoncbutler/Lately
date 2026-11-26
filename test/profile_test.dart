@@ -1,0 +1,1331 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:lately/data/database.dart';
+import 'package:lately/data/device_sources.dart';
+import 'package:lately/data/providers.dart';
+import 'package:lately/data/repository.dart';
+import 'package:lately/domain/timezones.dart';
+import 'package:lately/features/log/log_sheet.dart';
+import 'package:lately/features/profile/profile_screen.dart';
+import 'package:lately/ui/theme.dart';
+
+import 'support/fakes.dart';
+
+class _Tz implements DeviceTimezone {
+  @override
+  Future<String> current() async => 'America/Chicago';
+}
+
+void main() {
+  late LatelyDatabase db;
+  late Repository repo;
+  late FakeLauncher launcher;
+  late String groupId;
+  late String sam;
+  // 2026-11-11 14:10 UTC: Lisbon 2:10 pm
+  final fixedNow = DateTime.utc(2026, 11, 11, 14, 10);
+
+  setUpAll(ensureTimezonesLoaded);
+
+  setUp(() async {
+    db = LatelyDatabase(NativeDatabase.memory());
+    repo = Repository(db, clock: () => fixedNow);
+    launcher = FakeLauncher();
+    await repo.completeSetup();
+    groupId = (await repo.listGroups()).firstWhere((g) => g.name == 'Friends').id;
+    sam = await repo.createPerson(
+      displayName: 'Sam',
+      groupId: groupId,
+      timezone: 'Europe/Lisbon',
+      timezoneConfirmed: true,
+      contactMethodType: 'text',
+      contactMethodValue: '+351 555 0142',
+      phone: '+351 555 0142',
+      lastTalkedEstimate: fixedNow.subtract(const Duration(days: 30)),
+    );
+  });
+
+  void testApp(String name, Future<void> Function(WidgetTester tester) body) {
+    testWidgets(name, (tester) async {
+      await body(tester);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.runAsync(db.close);
+    });
+  }
+
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 4; i++) {
+      await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openProfile(WidgetTester tester, {String? id, Brightness brightness = Brightness.light}) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        snapshotDirProvider.overrideWithValue(Directory.systemTemp),
+        deviceTimezoneProvider.overrideWithValue(_Tz()),
+        phoneLauncherProvider.overrideWithValue(launcher),
+        nowProvider.overrideWithValue(() => fixedNow),
+      ],
+      child: MaterialApp(
+        theme: latelyThemeFor(brightness),
+        home: ProfileScreen(personId: id ?? sam),
+      ),
+    ));
+    await settle(tester);
+  }
+
+  Future<void> pickBirthday(WidgetTester tester, String month, String day, {String? year, bool open = true}) async {
+    if (open) {
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const Key('bday-month')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(month).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bday-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(day).last);
+    await tester.pumpAndSettle();
+    if (year != null) await tester.enterText(find.byKey(const Key('bday-year')), year);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save').last);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> typeAndEnter(WidgetTester tester, Finder f, String text) async {
+    await tester.enterText(f, text);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
+  }
+
+  Future<void> addNextTime(String text) =>
+      repo.createLine(personId: sam, block: 'next_time', text: text);
+
+  group('header and facts', () {
+    testApp('shows who they are, where, and the key facts', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(birthday: Value('--03-14'), hometown: Value('Porto'), socials: Value('["@old.handle"]')));
+      await repo.createChat(personId: sam, occurredAt: DateTime.utc(2026, 7, 30, 12), type: 'person', depth: 'deep', length: 'long');
+      await repo.createChat(personId: sam, occurredAt: DateTime.utc(2026, 9, 21, 12), type: 'call', depth: 'varied', length: 'catchup', durationMinutes: 30, feelings: ['happy'], note: 'Caught up on the move');
+      await repo.createChat(personId: sam, occurredAt: DateTime.utc(2026, 9, 2, 12), type: 'text', depth: 'shallow', length: 'quick');
+      await openProfile(tester);
+
+      expect(find.text('Sam'), findsOneWidget);
+      expect(find.text('Friends'), findsOneWidget);
+      expect(find.text('2:10 pm there'), findsOneWidget);
+      expect(find.text('Mar 14'), findsOneWidget);
+      expect(find.text('Every 30 days'), findsOneWidget);
+      expect(find.text('Lisbon'), findsOneWidget);
+      expect(find.text('Text'), findsOneWidget);
+      expect(find.text('Jul 30'), findsWidgets); // last in person (also in chat list when expanded)
+      expect(find.text('Sep 21'), findsWidgets); // last call or text
+
+      // Hidden until expanded.
+      expect(find.text('Porto'), findsNothing);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('Porto'), findsOneWidget);
+      expect(find.text('@old.handle'), findsNothing); // the old free-text socials are no longer shown
+      expect(find.text('Other socials'), findsNothing);
+      expect(find.descendant(of: find.byKey(const Key('fact-Number')), matching: find.textContaining('+351')), findsOneWidget);
+      expect(find.text('Fewer details'), findsOneWidget);
+    });
+
+    testApp('a personal interval shows instead of the group default', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(intervalOverrideDays: Value(10)));
+      await openProfile(tester);
+      expect(find.text('Every 10 days'), findsOneWidget);
+    });
+
+    testApp('no chats says None yet', (tester) async {
+      await openProfile(tester);
+      expect(find.text('None yet'), findsNWidgets(2));
+      expect(find.text('No chats yet. Log one after you talk.'), findsOneWidget);
+    });
+
+    testApp('recent chats show two, then all', (tester) async {
+      for (var d = 1; d <= 3; d++) {
+        await repo.createChat(personId: sam, occurredAt: DateTime.utc(2026, 10, d, 12), type: 'call', depth: 'varied', length: 'catchup', note: 'note $d');
+      }
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.text('3 logged'), 300, scrollable: find.byType(Scrollable).first);
+      expect(find.text('3 logged'), findsOneWidget);
+      expect(find.text('note 3'), findsOneWidget);
+      expect(find.text('note 1'), findsNothing);
+      await tester.tap(find.text('See all (3)'));
+      await tester.pumpAndSettle();
+      expect(find.text('note 1'), findsOneWidget);
+    });
+
+    testApp('an unfinished person is flagged and shows no made-up clock', (tester) async {
+      final jo = (await repo.createPeople([(displayName: 'Jo', phone: null)],
+          groupId: groupId, timezone: 'America/Chicago', timezoneConfirmed: false)).single;
+      await openProfile(tester, id: jo);
+      expect(find.textContaining('Finish setup'), findsWidgets);
+      expect(find.text('Not set'), findsOneWidget);
+      expect(find.textContaining('there'), findsNothing);
+    });
+
+    testApp('works in dark mode too', (tester) async {
+      await openProfile(tester, brightness: Brightness.dark);
+      expect(find.text('Sam'), findsOneWidget);
+    });
+  });
+
+  group('Next time', () {
+    testApp('plus adds a line; Enter keeps the field open for another', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('add-Next time')));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, find.byKey(const Key('add-field')), 'Ask about the new job');
+      expect(find.byKey(const Key('add-field')), findsOneWidget);
+      await typeAndEnter(tester, find.byKey(const Key('add-field')), 'Send the trail photos');
+      final lines = await repo.linesFor(sam, block: 'next_time');
+      expect(lines.map((l) => l.lineText), ['Ask about the new job', 'Send the trail photos']);
+      expect(find.text('Ask about the new job'), findsOneWidget);
+    });
+
+    testApp('the checkbox ticks without opening the editor, and the line is kept', (tester) async {
+      await addNextTime('Ask about the new job');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam)).single.id;
+      await tester.tap(find.byKey(Key('check-$id')));
+      await settle(tester);
+      final l = (await repo.linesFor(sam)).single;
+      expect(l.done, isTrue);
+      expect(l.doneAt, isNotNull);
+      expect(find.byKey(Key('edit-$id')), findsNothing); // no editor
+      expect(find.text('Ask about the new job'), findsOneWidget); // still listed
+      await tester.tap(find.byKey(Key('check-$id')));
+      await settle(tester);
+      expect((await repo.linesFor(sam)).single.done, isFalse);
+    });
+
+    testApp('tap the text to edit in place', (tester) async {
+      await addNextTime('Ask about the job');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam)).single.id;
+      await tester.tap(find.byKey(Key('line-$id')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('edit-$id')), findsOneWidget);
+      await typeAndEnter(tester, find.byKey(Key('edit-$id')), 'Ask about the new job');
+      expect((await repo.linesFor(sam)).single.lineText, 'Ask about the new job');
+      expect(find.byKey(Key('edit-$id')), findsNothing);
+    });
+
+    testApp('editing to empty leaves the line as it was', (tester) async {
+      await addNextTime('Keep me');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam)).single.id;
+      await tester.tap(find.byKey(Key('line-$id')));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, find.byKey(Key('edit-$id')), '   ');
+      expect((await repo.linesFor(sam)).single.lineText, 'Keep me');
+    });
+
+    testApp('trash while editing deletes, with an Undo bar', (tester) async {
+      await addNextTime('Delete me');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam)).single.id;
+      await tester.tap(find.byKey(Key('line-$id')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('trash-$id')));
+      await settle(tester);
+      expect(await repo.linesFor(sam), isEmpty);
+      expect(find.text('Undo'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect((await repo.linesFor(sam)).single.lineText, 'Delete me');
+    });
+
+    testApp('swipe left deletes with Undo and no confirmation; swipe right does nothing', (tester) async {
+      await addNextTime('Swipe me');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam)).single.id;
+
+      await tester.drag(find.byKey(Key('dismiss-$id')), const Offset(500, 0)); // right
+      await settle(tester);
+      expect((await repo.linesFor(sam)), hasLength(1));
+      expect(find.text('Swipe me'), findsOneWidget);
+
+      await tester.drag(find.byKey(Key('dismiss-$id')), const Offset(-500, 0)); // left
+      await settle(tester);
+      expect(await repo.linesFor(sam), isEmpty);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Undo'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect(find.text('Swipe me'), findsOneWidget);
+    });
+
+    testApp('the Undo bar goes away by itself after three seconds', (tester) async {
+      await addNextTime('Swipe me');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam)).single.id;
+      await tester.drag(find.byKey(Key('dismiss-$id')), const Offset(-500, 0));
+      await settle(tester);
+      expect(find.text('Undo'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('Undo'), findsOneWidget); // not yet
+      await tester.pump(const Duration(seconds: 2)); // past the three seconds
+      await tester.pumpAndSettle();
+      expect(find.text('Undo'), findsNothing);
+      expect(await repo.linesFor(sam), isEmpty); // and the delete stands
+    });
+
+    testApp('a newer message replaces the Undo bar instead of queueing behind it', (tester) async {
+      await addNextTime('One');
+      await addNextTime('Two');
+      await openProfile(tester);
+      final lines = await repo.linesFor(sam);
+      await tester.drag(find.byKey(Key('dismiss-${lines[0].id}')), const Offset(-500, 0));
+      await settle(tester);
+      await tester.drag(find.byKey(Key('dismiss-${lines[1].id}')), const Offset(-500, 0));
+      await settle(tester);
+      await tester.tap(find.text('Undo')); // undoes the newest only
+      await settle(tester);
+      expect(find.text('Two'), findsOneWidget);
+      expect(find.text('One'), findsNothing);
+    });
+
+    testApp('Next time shows up to six lines, oldest first; See all shows the rest', (tester) async {
+      final all = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+      for (final t in all) {
+        await addNextTime(t);
+      }
+      await openProfile(tester);
+      for (final t in all.take(6)) {
+        expect(find.text(t), findsOneWidget, reason: t);
+      }
+      expect(find.text('seven'), findsNothing);
+      expect(tester.getTopLeft(find.text('one')).dy, lessThan(tester.getTopLeft(find.text('six')).dy));
+      expect(find.text('See all (8)'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('expand-Next time')));
+      await tester.pumpAndSettle();
+      for (final t in ['seven', 'eight']) {
+        expect(find.text(t), findsOneWidget);
+      }
+      await tester.tap(find.byKey(const Key('expand-Next time')));
+      await tester.pumpAndSettle();
+      expect(find.text('eight'), findsNothing);
+    });
+
+    testApp('with six or fewer lines there is no See all', (tester) async {
+      for (final t in ['one', 'two', 'three', 'four', 'five', 'six']) {
+        await addNextTime(t);
+      }
+      await openProfile(tester);
+      expect(find.byKey(const Key('expand-Next time')), findsNothing);
+      expect(find.text('six'), findsOneWidget);
+    });
+
+    testApp('Next time grows a row at a time to six, then stops', (tester) async {
+      await openProfile(tester);
+      double h() => tester.getSize(find.byKey(const Key('block-Next time'))).height;
+      final empty = h(); // header and three ruled rows
+      final heights = <double>[];
+      for (var i = 1; i <= 8; i++) {
+        await addNextTime('line $i');
+        await settle(tester);
+        heights.add(h());
+      }
+      // 1 to 3 lines: no change (they fill the ruled rows).
+      expect(heights.take(3), everyElement(empty));
+      // 4, 5, 6 lines: one 44-point row each.
+      expect(heights[3], empty + 44);
+      expect(heights[4], empty + 88);
+      expect(heights[5], empty + 132);
+      // 7 and 8 lines: no more rows, only the See all row appears.
+      expect(heights[6], empty + 132 + 48);
+      expect(heights[7], heights[6]);
+    });
+
+    testApp('adding to a full Next time does not make it taller', (tester) async {
+      for (var i = 1; i <= 7; i++) {
+        await addNextTime('line $i');
+      }
+      await openProfile(tester);
+      final before = tester.getSize(find.byKey(const Key('block-Next time'))).height;
+      await tester.tap(find.byKey(const Key('add-Next time')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-field')), findsOneWidget);
+      expect(tester.getSize(find.byKey(const Key('block-Next time'))).height, before);
+    });
+  });
+
+  group('blocks keep a fixed size until you tap See all', () {
+    const long = 'A very long line that goes on and on about the trip to the coast, the old friends, and what they said at dinner';
+    double heightOf(WidgetTester tester, String title) => tester.getSize(find.byKey(Key('block-$title'))).height;
+
+    testApp('empty, short and long blocks are all the same height', (tester) async {
+      await repo.createLine(personId: sam, block: 'about', text: long);
+      await repo.createLine(personId: sam, block: 'about', text: long);
+      await repo.createLine(personId: sam, block: 'about', text: long);
+      await repo.createLine(personId: sam, block: 'interests', text: 'Chess');
+      await openProfile(tester);
+      final empty = heightOf(tester, 'Their people'); // nothing in it
+      expect(heightOf(tester, 'Interests'), empty); // one short line
+      expect(heightOf(tester, 'About'), empty); // three very long lines
+    });
+
+    testApp('a long line is cut off with an ellipsis instead of wrapping', (tester) async {
+      await repo.createLine(personId: sam, block: 'about', text: long);
+      await addNextTime(long);
+      await openProfile(tester);
+      for (final b in ['About', 'Next time']) {
+        final text = tester.widget<Text>(find.descendant(of: find.byKey(Key('block-$b')), matching: find.text(long)));
+        expect(text.maxLines, 1, reason: b);
+        expect(text.overflow, TextOverflow.ellipsis, reason: b);
+      }
+    });
+    testApp('more than three lines does not grow the block, because the See all row is always reserved', (tester) async {
+      await openProfile(tester);
+      final before = heightOf(tester, 'Interests');
+      for (final t in ['one', 'two', 'three', 'four', 'five', 'six']) {
+        await repo.createLine(personId: sam, block: 'interests', text: t);
+      }
+      await settle(tester);
+      expect(heightOf(tester, 'Interests'), before);
+      expect(find.text('See all (6)'), findsOneWidget);
+    });
+
+    testApp('adding a line does not grow the block, even when it already has three', (tester) async {
+      for (final t in ['one', 'two', 'three']) {
+        await repo.createLine(personId: sam, block: 'interests', text: t);
+      }
+      await openProfile(tester);
+      final before = heightOf(tester, 'Interests');
+      await tester.tap(find.byKey(const Key('add-Interests')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-field')), findsOneWidget);
+      expect(heightOf(tester, 'Interests'), before);
+      await typeAndEnter(tester, find.byKey(const Key('add-field')), long);
+      expect(heightOf(tester, 'Interests'), before);
+    });
+
+    testApp('editing a long line does not grow the block either', (tester) async {
+      final id = await repo.createLine(personId: sam, block: 'about', text: long);
+      await openProfile(tester);
+      final before = heightOf(tester, 'About');
+      await tester.tap(find.byKey(Key('line-$id')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('edit-$id')), findsOneWidget);
+      expect(heightOf(tester, 'About'), before);
+    });
+
+    testApp('blocks side by side line up', (tester) async {
+      await repo.createLine(personId: sam, block: 'about', text: long);
+      await openProfile(tester);
+      final about = tester.getRect(find.byKey(const Key('block-About')));
+      final interests = tester.getRect(find.byKey(const Key('block-Interests')));
+      final family = tester.getRect(find.byKey(const Key('block-Their people')));
+      expect(interests.height, family.height);
+      expect(interests.top, family.top);
+      expect(about.height, interests.height);
+    });
+
+    testApp('See all expands to the whole of every line, full width; Show less restores the size', (tester) async {
+      for (final t in ['one', 'two', 'three', 'four']) {
+        await repo.createLine(personId: sam, block: 'about', text: t == 'four' ? long : t);
+      }
+      await openProfile(tester);
+      final collapsed = heightOf(tester, 'About');
+      final collapsedWidth = tester.getSize(find.byKey(const Key('block-About'))).width;
+      await tester.tap(find.byKey(const Key('expand-About')));
+      await tester.pumpAndSettle();
+      expect(find.text(long), findsOneWidget);
+      final text = tester.widget<Text>(find.descendant(of: find.byKey(const Key('block-About')), matching: find.text(long)));
+      expect(text.maxLines, isNull); // wraps to show all of it
+      expect(tester.getSize(find.byKey(const Key('block-About'))).width, greaterThan(collapsedWidth));
+      expect(heightOf(tester, 'About'), greaterThan(collapsed)); // the only time it grows
+      await tester.tap(find.byKey(const Key('expand-About')));
+      await tester.pumpAndSettle();
+      expect(heightOf(tester, 'About'), collapsed);
+    });
+
+    testApp('Their people: a long name is cut off, and the tile keeps its size', (tester) async {
+      await repo.createRelationship(personId: sam, name: 'Maria Fernanda de los Angeles Rodriguez', relation: 'grandmother');
+      await openProfile(tester);
+      final h = heightOf(tester, 'Their people');
+      expect(h, heightOf(tester, 'Interests'));
+    });
+
+    testApp('the log popup uses the same sizes', (tester) async {
+      for (final t in ['one', 'two', 'three', 'four', 'five', 'six', 'seven']) {
+        await addNextTime(t);
+      }
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-log')));
+      await settle(tester);
+      final inPopup = find.descendant(of: find.byType(LogSheet), matching: find.byKey(const Key('expand-Next time')));
+      await tester.scrollUntilVisible(inPopup, 300, scrollable: find.descendant(of: find.byType(LogSheet), matching: find.byType(Scrollable)).first);
+      expect(inPopup, findsOneWidget); // collapsed, with See all
+    });
+  });
+
+  group('deleting a chat (swipe left in Recent chats)', () {
+    Future<String> chat(DateTime at, String type, {String? note}) => repo.logChat(
+        personId: sam, occurredAt: at, type: type, depth: 'varied', durationMinutes: 30, note: note);
+
+    testApp('swipe left deletes it with an Undo bar and no confirmation; last contact is recomputed', (tester) async {
+      await chat(DateTime.utc(2026, 7, 30, 12), 'person');
+      await chat(DateTime.utc(2026, 9, 2, 12), 'text');
+      final newest = await chat(DateTime.utc(2026, 9, 21, 12), 'call', note: 'Newest');
+      await openProfile(tester);
+      expect(find.text('Sep 21'), findsWidgets); // last call or text
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$newest')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$newest')), const Offset(-500, 0));
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Undo'), findsOneWidget);
+      expect(await repo.getChat(newest), isNull);
+      expect(find.text('2 logged'), findsOneWidget);
+      // The call is gone, so the last call or text is now the Sep 2 text.
+      expect(find.byKey(Key('chat-$newest')), findsNothing);
+      final facts = find.byKey(const Key('fact-Last call or text'));
+      expect(find.descendant(of: facts, matching: find.text('Sep 2')), findsOneWidget);
+    });
+
+    testApp('Undo brings it back', (tester) async {
+      final c = await chat(DateTime.utc(2026, 9, 21, 12), 'call', note: 'Keep me');
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$c')), const Offset(-500, 0));
+      await settle(tester);
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect(await repo.getChat(c), isNotNull);
+      expect(find.text('Keep me'), findsOneWidget);
+    });
+
+    testApp('swiping right does nothing', (tester) async {
+      final c = await chat(DateTime.utc(2026, 9, 21, 12), 'call');
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$c')), const Offset(500, 0));
+      await settle(tester);
+      expect(await repo.getChat(c), isNotNull);
+    });
+
+    testApp('tapping a chat still opens its details', (tester) async {
+      final c = await chat(DateTime.utc(2026, 9, 21, 12), 'call', note: 'Caught up');
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.byKey(Key('chat-$c')));
+      await settle(tester);
+      expect(find.descendant(of: find.byType(BottomSheet), matching: find.text('What it was about'.toUpperCase())), findsOneWidget);
+    });
+
+    testApp('a Next time item it covered is offered again for the next chat', (tester) async {
+      final l = await repo.createLine(personId: sam, block: 'next_time', text: 'Ask about the job');
+      await repo.setLineDone(l, true);
+      final c = await repo.logChat(personId: sam, occurredAt: DateTime.utc(2026, 9, 21, 12), type: 'call', depth: 'varied', durationMinutes: 30, coveredLineIds: [l]);
+      await openProfile(tester);
+      await tester.scrollUntilVisible(find.byKey(Key('swipe-chat-$c')), 300, scrollable: find.byType(Scrollable).first);
+      await tester.drag(find.byKey(Key('dismiss-chat-$c')), const Offset(-500, 0));
+      await settle(tester);
+      expect((await repo.linesFor(sam)).single.chatId, isNull);
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect((await repo.linesFor(sam)).single.chatId, c);
+    });
+  });
+
+  group('blocks', () {
+    testApp('an empty block keeps its size with ruled blank rows', (tester) async {
+      await openProfile(tester);
+      expect(find.byKey(const Key('ruled-Interests-0')), findsOneWidget);
+      expect(find.byKey(const Key('ruled-Interests-1')), findsOneWidget);
+      expect(find.byKey(const Key('ruled-Interests-2')), findsOneWidget);
+      // Tapping a blank row starts adding.
+      await tester.tap(find.byKey(const Key('ruled-Interests-0')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-field')), findsOneWidget);
+    });
+
+    testApp('Interests: newest three show, See all expands, Show less collapses', (tester) async {
+      await openProfile(tester);
+      for (final t in ['Chess', 'Sourdough', 'Film photography', 'Hiking']) {
+        await tester.tap(find.byKey(const Key('add-Interests')));
+        await tester.pumpAndSettle();
+        await typeAndEnter(tester, find.byKey(const Key('add-field')), t);
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await settle(tester);
+      }
+      expect((await repo.linesFor(sam, block: 'interests')).map((l) => l.lineText),
+          ['Chess', 'Sourdough', 'Film photography', 'Hiking']);
+      expect(find.text('Hiking'), findsOneWidget);
+      expect(find.text('Chess'), findsNothing); // oldest hidden
+      await tester.tap(find.text('See all (4)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chess'), findsOneWidget);
+      await tester.tap(find.text('Show less'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chess'), findsNothing);
+    });
+
+    testApp('About: edit and swipe-delete follow the same rules', (tester) async {
+      await repo.createLine(personId: sam, block: 'about', text: 'Allergic to cats');
+      await openProfile(tester);
+      final id = (await repo.linesFor(sam, block: 'about')).single.id;
+      await tester.tap(find.byKey(Key('line-$id')));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, find.byKey(Key('edit-$id')), 'Allergic to dogs');
+      expect((await repo.linesFor(sam, block: 'about')).single.lineText, 'Allergic to dogs');
+      await tester.drag(find.byKey(Key('dismiss-$id')), const Offset(-500, 0));
+      await settle(tester);
+      expect(await repo.linesFor(sam, block: 'about'), isEmpty);
+    });
+
+    testApp('block order follows the setup choice', (tester) async {
+      await repo.setBlockOrder(['next_time', 'about', 'family', 'interests']);
+      await openProfile(tester);
+      final about = tester.getTopLeft(find.byKey(const Key('block-About')));
+      final family = tester.getTopLeft(find.byKey(const Key('block-Their people')));
+      final interests = tester.getTopLeft(find.byKey(const Key('block-Interests')));
+      expect(about.dx, lessThan(family.dx)); // first row: About, Their people
+      expect(about.dy, family.dy);
+      expect(interests.dy, greaterThan(about.dy)); // wraps to the next row
+    });
+
+    testApp('Add a section creates a custom block that holds lines', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('add-section')));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, find.byKey(const Key('section-name')), 'Gift ideas');
+      final blocks = await repo.listCustomBlocks();
+      expect(blocks.single.name, 'Gift ideas');
+      expect(blocks.single.key, 'c_gift_ideas');
+      expect(find.byKey(const Key('block-Gift ideas')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('add-Gift ideas')));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, find.byKey(const Key('add-field')), 'Tea set');
+      expect((await repo.linesFor(sam, block: 'c_gift_ideas')).single.lineText, 'Tea set');
+    });
+  });
+
+  group('Their people', () {
+    testApp('add a tile with name, relation and birthday', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('add-Their people')));
+      await tester.pumpAndSettle();
+      expect(find.text('Add to their people'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('rel-name')), 'Rosa');
+      await tester.enterText(find.byKey(const Key('rel-relation')), 'grandmother');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await settle(tester);
+      final r = (await repo.relationshipsFor(sam)).single;
+      expect((r.name, r.relation), ('Rosa', 'grandmother'));
+      expect(find.text('Rosa, grandmother'), findsOneWidget);
+    });
+
+    testApp('Save needs a name', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('add-Their people')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save')).onPressed, isNull);
+    });
+
+    testApp('tapping a tile opens its card, and notes follow the line rules', (tester) async {
+      final rid = await repo.createRelationship(personId: sam, name: 'Rosa', relation: 'grandmother');
+      await openProfile(tester);
+      await tester.tap(find.text('Rosa, grandmother'));
+      await settle(tester);
+      expect(find.widgetWithText(TextField, 'Rosa'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('add-Notes')));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, find.byKey(const Key('add-field')), 'Bakes on Sundays');
+      final notes = (await repo.linesFor(sam)).where((l) => l.relationshipId == rid).toList();
+      expect(notes.single.lineText, 'Bakes on Sundays');
+      expect(notes.single.block, 'family');
+
+      // The note is not shown as one of Sam's own lines.
+      await tester.tap(find.byKey(const Key('rel-name')));
+      await tester.enterText(find.byKey(const Key('rel-name')), 'Rosa M');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await settle(tester);
+      expect((await repo.relationshipsFor(sam)).single.name, 'Rosa M');
+      expect(find.text('Bakes on Sundays'), findsNothing);
+    });
+
+    testApp('adding a name already listed offers to open that tile instead', (tester) async {
+      await repo.createRelationship(personId: sam, name: 'Rosa', relation: 'grandmother');
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('add-Their people')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('rel-name')), 'ros');
+      await tester.pumpAndSettle();
+      expect(find.text('Already in their people. Tap to add a note instead:'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ActionChip, 'Rosa, grandmother'));
+      await settle(tester);
+      expect(find.widgetWithText(TextField, 'Rosa'), findsOneWidget); // opened the existing card
+      expect((await repo.relationshipsFor(sam)), hasLength(1));
+    });
+
+    testApp('swipe left removes a tile with Undo; Delete in the card does too', (tester) async {
+      final a = await repo.createRelationship(personId: sam, name: 'Rosa');
+      await repo.createRelationship(personId: sam, name: 'Ines', relation: 'partner');
+      await openProfile(tester);
+      await tester.drag(find.byKey(Key('dismiss-$a')), const Offset(-500, 0));
+      await settle(tester);
+      expect((await repo.relationshipsFor(sam)).map((r) => r.name), ['Ines']);
+      await tester.tap(find.text('Undo'));
+      await settle(tester);
+      expect(await repo.relationshipsFor(sam), hasLength(2));
+
+      await tester.tap(find.text('Ines, partner'));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Delete'));
+      await settle(tester);
+      expect((await repo.relationshipsFor(sam)).map((r) => r.name), ['Rosa']);
+      expect(find.text('Undo'), findsOneWidget);
+    });
+
+    testApp('a person added with notes keeps them', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('add-Their people')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('rel-name')), 'Tomas');
+      await tester.tap(find.byKey(const Key('add-Notes')));
+      await tester.pumpAndSettle();
+      await typeAndEnter(tester, find.byKey(const Key('add-field')), 'Climbs');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await settle(tester);
+      final r = (await repo.relationshipsFor(sam)).single;
+      expect((await repo.linesFor(sam)).where((l) => l.relationshipId == r.id).single.lineText, 'Climbs');
+    });
+  });
+
+  group('Edit person', () {
+    Future<void> openEdit(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('profile-edit')));
+      await settle(tester);
+    }
+
+    testApp('saves every detail', (tester) async {
+      final parents = (await repo.listGroups()).firstWhere((g) => g.name == 'Parents').id;
+      await openProfile(tester);
+      await openEdit(tester);
+      expect(find.text('Edit Sam'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('edit-name')), 'Samuel');
+      await tester.tap(find.textContaining('Parents'));
+      await tester.enterText(find.byKey(const Key('phone-field')), '+351 912 345 678');
+      await tester.enterText(find.byKey(const Key('edit-interval')), '10');
+      await tester.enterText(find.byKey(const Key('edit-hometown')), 'Porto');
+      await tester.tap(find.byKey(const Key('channel-call')));
+      await pickBirthday(tester, 'Jan', '14');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+
+      final p = (await repo.getPerson(sam))!;
+      expect(p.displayName, 'Samuel');
+      expect(p.groupId, parents);
+      expect(p.contactMethodType, 'call');
+      expect(p.contactMethodValue, '+351912345678');
+      expect(p.phone, '+351912345678');
+      expect(p.intervalOverrideDays, 10);
+      expect(p.hometown, 'Porto');
+      expect(p.socials, isNull); // untouched by editing
+      expect(p.birthday, '--01-14');
+      expect(find.text('Samuel'), findsOneWidget);
+      expect(find.text('Jan 14'), findsOneWidget);
+      expect(find.text('Every 10 days'), findsOneWidget);
+    });
+
+    testApp('changing the city updates the timezone and the clock', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.text('Change'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'tokyo');
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Tokyo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect((await repo.getPerson(sam))!.timezone, 'Asia/Tokyo');
+      expect(find.text('11:10 pm there'), findsOneWidget);
+    });
+
+    testApp('a blank interval goes back to the group default', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(intervalOverrideDays: Value(10)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('edit-interval')), '');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect((await repo.getPerson(sam))!.intervalOverrideDays, isNull);
+      expect(find.text('Every 30 days'), findsOneWidget);
+    });
+
+    testApp('archive hides them; restore brings them back; the banner shows in between', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.text('Archive Sam'), 300, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.text('Archive Sam'));
+      await settle(tester);
+      expect(await repo.listPeople(), isEmpty);
+      expect((await repo.listArchivedPeople()).single.id, sam);
+      expect(find.text('Archived. Not suggested on Home.'), findsOneWidget);
+      await tester.tap(find.text('Restore'));
+      await settle(tester);
+      expect((await repo.listPeople()).single.id, sam);
+      expect(find.text('Archived. Not suggested on Home.'), findsNothing);
+    });
+
+    testApp('Delete forever only exists for archived people, asks first, then removes everything', (tester) async {
+      await addNextTime('x');
+      await repo.createRelationship(personId: sam, name: 'Rosa');
+      await openProfile(tester);
+      await openEdit(tester);
+      expect(find.text('Delete forever'), findsNothing); // not archived
+      await tester.scrollUntilVisible(find.text('Archive Sam'), 300, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.text('Archive Sam'));
+      await settle(tester);
+
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.text('Delete forever'), 300, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.text('Delete forever'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('cannot be undone'), findsOneWidget);
+      expect(await repo.getPerson(sam), isNotNull); // nothing yet
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete forever'));
+      await settle(tester);
+      expect(await repo.getPerson(sam), isNull);
+      expect(await repo.linesFor(sam), isEmpty);
+      expect(await repo.relationshipsFor(sam), isEmpty);
+    });
+  });
+
+  group('Birthday picker', () {
+    Future<void> openEdit(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('profile-edit')));
+      await settle(tester);
+    }
+
+    Future<String?> saved() async => (await repo.getPerson(sam))!.birthday;
+
+    testApp('month and day from lists; the year is optional, so it is not locked to 2000', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await pickBirthday(tester, 'Mar', '14');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '--03-14');
+      expect(find.text('Mar 14'), findsOneWidget);
+    });
+
+    testApp('a typed year is plain digits with no slashes', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await pickBirthday(tester, 'Mar', '14', year: '1990');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '1990-03-14');
+      expect(find.text('Mar 14, 1990'), findsOneWidget);
+    });
+
+    testApp('only digits are accepted in the year', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('bday-year')), '19/9x0');
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('bday-year'))).controller!.text, '1990');
+    });
+
+    testApp('Save needs month and day; a bad year is explained', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      final save = find.widgetWithText(FilledButton, 'Save').last;
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+      await tester.tap(find.byKey(const Key('bday-month')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('May').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bday-day')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('5').last);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+      await tester.enterText(find.byKey(const Key('bday-year')), '19');
+      await tester.pumpAndSettle();
+      expect(find.text('Use a 4-digit year, or leave it blank'), findsOneWidget);
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+    });
+
+    testApp('days follow the month, and Feb 29 needs a leap year', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bday-month')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Feb').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bday-day')));
+      await tester.pumpAndSettle();
+      expect(find.text('29').last, findsOneWidget);
+      expect(find.text('30'), findsNothing); // no Feb 30
+      await tester.tap(find.text('29').last);
+      await tester.pumpAndSettle();
+      final save = find.widgetWithText(FilledButton, 'Save').last;
+      expect(tester.widget<FilledButton>(save).onPressed, isNotNull); // year unknown: allowed
+      // 2023 is not a leap year, so the day moves to Feb 28.
+      await tester.enterText(find.byKey(const Key('bday-year')), '2023');
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '2023-02-28');
+    });
+
+    testApp('Cancel keeps the old birthday; Clear removes it', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(birthday: Value('1990-09-27')));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      // The dialog starts from the saved date.
+      expect(find.text('Sep'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('bday-year'))).controller!.text, '1990');
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), '1990-09-27');
+
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('edit-birthday')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+      expect(await saved(), isNull);
+      expect(find.text('Not added'), findsWidgets);
+    });
+
+    testApp('Their people cards use the same picker', (tester) async {
+      final rid = await repo.createRelationship(personId: sam, name: 'Rosa');
+      await openProfile(tester);
+      await tester.tap(find.text('Rosa'));
+      await settle(tester);
+      await tester.tap(find.text('Add birthday'));
+      await tester.pumpAndSettle();
+      await pickBirthday(tester, 'Oct', '3', year: '2014', open: false);
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await settle(tester);
+      expect((await repo.relationshipsFor(sam)).firstWhere((r) => r.id == rid).birthday, '2014-10-03');
+    });
+  });
+
+  group('Contact: straight to their preferred app', () {
+    Future<void> prefer(String type, {String? instagram}) =>
+        repo.updatePerson(sam, PeopleCompanion(contactMethodType: Value(type), instagram: Value(instagram)));
+
+    testApp('the default is Text: one tap, no chooser, and it remembers who you tried', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['sms:+3515550142']);
+      expect(find.textContaining('Reach'), findsNothing); // no chooser sheet
+      final s = await repo.getSettings();
+      expect(s.recentContactPersonId, sam);
+      expect(s.recentContactAt, isNotNull);
+    });
+
+    testApp('Call opens the phone app', (tester) async {
+      await prefer('call');
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['call:+3515550142']);
+    });
+
+    testApp('WhatsApp opens the chat, with the number as digits only', (tester) async {
+      await prefer('whatsapp');
+      await openProfile(tester);
+      expect(find.text('WhatsApp'), findsOneWidget); // Prefers
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['whatsapp:3515550142']);
+    });
+
+    testApp('a number saved without a country code is read in their country for WhatsApp', (tester) async {
+      await prefer('whatsapp');
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value('912345678'), contactMethodValue: Value('912345678')));
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['whatsapp:351912345678']); // Lisbon: +351
+    });
+
+    testApp('Instagram opens their profile', (tester) async {
+      await prefer('instagram', instagram: 'sam.r');
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['ig-profile:sam.r']);
+    });
+
+    testApp('Facebook as the contact opens a Messenger chat', (tester) async {
+      await prefer('facebook');
+      await repo.updatePerson(sam, const PeopleCompanion(facebook: Value('sam.rodrigues')));
+      await openProfile(tester);
+      expect(find.text('Facebook'), findsOneWidget); // Prefers
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(launcher.calls, ['messenger:sam.rodrigues']);
+      expect((await repo.getSettings()).recentContactPersonId, sam);
+    });
+
+    testApp('Facebook preferred but no profile saved: disabled, and says what to add', (tester) async {
+      await prefer('facebook');
+      await openProfile(tester);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
+      expect(find.textContaining('Add their Facebook profile'), findsOneWidget);
+    });
+
+    testApp('if the app cannot be opened it says so, and still remembers the attempt', (tester) async {
+      launcher = FakeLauncher(works: false);
+      await prefer('whatsapp');
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-contact')));
+      await settle(tester);
+      expect(find.text('Could not open WhatsApp. Is it installed?'), findsOneWidget);
+    });
+
+    testApp('with no number the button is disabled and says what to do', (tester) async {
+      final p = await repo.createPerson(displayName: 'Nobody', groupId: groupId, timezone: 'UTC', timezoneConfirmed: true, contactMethodType: 'text');
+      await openProfile(tester, id: p);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
+      expect(find.textContaining('Add a number to reach them.'), findsOneWidget);
+    });
+
+    testApp('Instagram preferred but no username: disabled, and says what to add', (tester) async {
+      await prefer('instagram');
+      await openProfile(tester);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
+      expect(find.textContaining('Add their Instagram username'), findsOneWidget);
+    });
+
+    testApp('a handle in the number box is not a number, so Text is disabled', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value('@sam.r'), contactMethodValue: Value('@sam.r')));
+      await openProfile(tester);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('profile-contact'))).onPressed, isNull);
+    });
+  });
+
+  group('tap their number or Instagram in More details', () {
+    testApp('the number offers Call, Text and WhatsApp, with the preferred one highlighted', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Number')));
+      await settle(tester);
+      expect(find.byKey(const Key('reach-call')), findsOneWidget);
+      expect(find.byKey(const Key('reach-text')), findsOneWidget);
+      expect(find.byKey(const Key('reach-whatsapp')), findsOneWidget);
+      expect(find.byType(FilledButton).evaluate().where((e) => (e.widget as FilledButton).key == const Key('reach-text')), isNotEmpty); // Text is the preference
+      await tester.tap(find.byKey(const Key('reach-whatsapp')));
+      await settle(tester);
+      expect(launcher.calls, ['whatsapp:3515550142']);
+      expect((await repo.getSettings()).recentContactPersonId, sam);
+    });
+
+    testApp('Call from the number sheet', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Number')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('reach-call')));
+      await settle(tester);
+      expect(launcher.calls, ['call:+3515550142']);
+    });
+
+    testApp('their Instagram opens straight to their profile, and that is not an attempt to talk', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(instagram: Value('sam.r')));
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('@sam.r'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('fact-Instagram')));
+      await settle(tester);
+      expect(launcher.calls, ['ig-profile:sam.r']); // no chooser, no DM
+      expect(find.text('Open DM'), findsNothing);
+      expect((await repo.getSettings()).recentContactPersonId, isNull);
+    });
+
+    testApp('their Facebook opens straight to their profile', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(facebook: Value('sam.rodrigues')));
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('sam.rodrigues'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('fact-Facebook')));
+      await settle(tester);
+      expect(launcher.calls, ['facebook:sam.rodrigues']);
+      expect((await repo.getSettings()).recentContactPersonId, isNull);
+    });
+
+    testApp('a profile that cannot be opened says so', (tester) async {
+      launcher = FakeLauncher(works: false);
+      await repo.updatePerson(sam, const PeopleCompanion(instagram: Value('sam.r')));
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Instagram')));
+      await settle(tester);
+      expect(find.text('Could not open Instagram. Is it installed?'), findsOneWidget);
+    });
+
+    testApp('with no Instagram or Facebook saved the rows are plain text', (tester) async {
+      await openProfile(tester);
+      await tester.tap(find.byKey(const Key('profile-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fact-Instagram')));
+      await tester.tap(find.byKey(const Key('fact-Facebook')));
+      await settle(tester);
+      expect(launcher.calls, isEmpty);
+    });
+  });
+
+  group('number box and country code (Edit person)', () {
+    Future<void> openEdit(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('profile-edit')));
+      await settle(tester);
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await settle(tester);
+    }
+
+    testApp('an international number fills in its own country', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('phone-field')), '+44 7400 123456');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('+44'), findsWidgets); // the box now shows the UK
+      expect(find.byKey(const Key('phone-hint')), findsOneWidget);
+      await save(tester);
+      expect((await repo.getPerson(sam))!.phone, '+447400123456');
+    });
+
+    testApp('a leading 0 means their own country (Portugal here), and the 0 goes', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('phone-field')), '0912345678');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Saved as +351 912 345 678'), findsOneWidget);
+      await save(tester);
+      expect((await repo.getPerson(sam))!.phone, '+351912345678');
+    });
+
+    testApp('with no city yet the box starts at the US, then follows the city you choose', (tester) async {
+      final jo = await repo.createPerson(displayName: 'Jo', groupId: groupId, timezone: 'America/Chicago', timezoneConfirmed: false, contactMethodType: 'text');
+      await openProfile(tester, id: jo);
+      await openEdit(tester);
+      expect(find.text('🇺🇸 +1'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Search a city, such as Lisbon'), 'tokyo');
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Tokyo'));
+      await tester.pumpAndSettle();
+      expect(find.text('🇯🇵 +81'), findsOneWidget);
+    });
+
+    testApp('the country can be searched by name or by code, and then sticks', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('country-button')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('country-search')), 'brazil');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('country-BR')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('country-search')), '+33');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('country-FR')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('country-search')), 'brazil');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('country-BR')));
+      await tester.pumpAndSettle();
+      expect(find.text('🇧🇷 +55'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('phone-field')), '11 99999 8888');
+      await tester.pumpAndSettle();
+      await save(tester);
+      expect((await repo.getPerson(sam))!.phone, '+5511999998888');
+    });
+
+    testApp('the sheet lists their country and the US first', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value(null), contactMethodValue: Value(null)));
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('country-button')));
+      await tester.pumpAndSettle();
+      final pt = tester.getTopLeft(find.byKey(const Key('country-PT'))).dy;
+      final us = tester.getTopLeft(find.byKey(const Key('country-US'))).dy;
+      final af = tester.getTopLeft(find.byKey(const Key('country-AF'))).dy;
+      expect(pt, lessThan(us));
+      expect(us, lessThan(af));
+    });
+
+    testApp('an existing number opens in its own country, written the way that country writes it', (tester) async {
+      await repo.updatePerson(sam, const PeopleCompanion(phone: Value('+351912345678'), contactMethodValue: Value('+351912345678')));
+      await openProfile(tester);
+      await openEdit(tester);
+      expect(find.text('🇵🇹 +351'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('phone-field'))).controller!.text, '912 345 678');
+    });
+
+    testApp('choosing WhatsApp and an Instagram link saves the username', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('channel-whatsapp')));
+      await tester.pumpAndSettle();
+      expect(find.text('Contact opens straight to WhatsApp.'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('edit-instagram')), 'https://www.instagram.com/sam.r/');
+      await tester.pumpAndSettle();
+      await save(tester);
+      final p = (await repo.getPerson(sam))!;
+      expect(p.contactMethodType, 'whatsapp');
+      expect(p.instagram, 'sam.r');
+    });
+
+    testApp('choosing Facebook, with a link, saves the username and says Messenger', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('channel-facebook')));
+      await tester.pumpAndSettle();
+      expect(find.text('Contact opens straight to Facebook Messenger.'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('edit-facebook')), 'https://www.facebook.com/sam.rodrigues?ref=bookmarks');
+      await tester.pumpAndSettle();
+      await save(tester);
+      final p = (await repo.getPerson(sam))!;
+      expect((p.contactMethodType, p.contactMethodValue, p.facebook), ('facebook', 'sam.rodrigues', 'sam.rodrigues'));
+    });
+
+    testApp('a Facebook entry that is not a profile is explained and blocks Save', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('edit-facebook')), 'no');
+      await tester.pumpAndSettle();
+      expect(find.text("That doesn't look like a Facebook profile"), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save changes')).onPressed, isNull);
+    });
+
+    testApp('the old free-text socials field is gone from Edit person', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      expect(find.byKey(const Key('edit-socials')), findsNothing);
+      expect(find.text('OTHER SOCIALS'), findsNothing);
+    });
+
+    testApp('an Instagram entry that is not a username is explained and blocks Save', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.enterText(find.byKey(const Key('edit-instagram')), '#nope');
+      await tester.pumpAndSettle();
+      expect(find.text("That doesn't look like a username"), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save changes')).onPressed, isNull);
+    });
+
+    testApp('an Instagram contact keeps the username as its value', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.tap(find.byKey(const Key('channel-instagram')));
+      await tester.enterText(find.byKey(const Key('edit-instagram')), '@sam.r');
+      await tester.pumpAndSettle();
+      await save(tester);
+      final p = (await repo.getPerson(sam))!;
+      expect((p.contactMethodType, p.contactMethodValue, p.instagram), ('instagram', 'sam.r', 'sam.r'));
+    });
+  });
+
+  group('Pause suggestions (Edit person > Manage)', () {
+    Future<void> openEdit(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('profile-edit')));
+      await settle(tester);
+    }
+
+    testApp('pick a date from a calendar: they are hidden from Home until then, with a way back', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.byKey(const Key('pause-button')), 300, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.byKey(const Key('pause-button')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.edit_outlined), findsNothing); // calendar only, no typed date
+      await tester.tap(find.text('20'));
+      await tester.tap(find.text('OK'));
+      await settle(tester);
+      final until = (await repo.getPerson(sam))!.snoozedUntil!.toLocal();
+      expect((until.month, until.day, until.hour), (11, 20, 0)); // the start of that day
+      expect(find.text('Paused until Nov 20. Not suggested on Home.'), findsOneWidget);
+
+      await tester.tap(find.text('Resume'));
+      await settle(tester);
+      expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
+      expect(find.textContaining('Paused until'), findsNothing);
+    });
+
+    testApp('the sheet shows the date, and can change it or resume', (tester) async {
+      await repo.snoozeUntil(sam, DateTime(2026, 11, 22).toUtc());
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.byKey(const Key('paused-text')), 300, scrollable: find.byType(Scrollable).last);
+      expect(find.text('Paused until Nov 22'), findsOneWidget);
+      expect(find.byKey(const Key('pause-button')), findsNothing);
+      await tester.tap(find.byKey(const Key('pause-resume')));
+      await settle(tester);
+      expect((await repo.getPerson(sam))!.snoozedUntil, isNull);
+    });
+
+    testApp('today and the past cannot be picked', (tester) async {
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.byKey(const Key('pause-button')), 300, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.byKey(const Key('pause-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('11')); // today (the 11th) is not selectable: nothing changes
+      await tester.tap(find.text('OK'));
+      await settle(tester);
+      final until = (await repo.getPerson(sam))!.snoozedUntil!.toLocal();
+      expect(until.day, 18); // still the suggested week-out date, not the 11th
+    });
+
+    testApp('Pause is for people you still want, so archived people do not show it', (tester) async {
+      await repo.archivePerson(sam);
+      await openProfile(tester);
+      await openEdit(tester);
+      await tester.scrollUntilVisible(find.text('Restore Sam'), 300, scrollable: find.byType(Scrollable).last);
+      expect(find.byKey(const Key('pause-button')), findsNothing);
+    });
+  });
+}

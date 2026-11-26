@@ -1,0 +1,49 @@
+{
+  "format": "lately-backup",
+  "formatVersion": "1.2",
+  "appVersion": "0.3.0",
+  "exportedAt": "2026-11-08T07:15:00Z",
+  "checksum": "sha256:58cdd74a04b074c38c508140cb8fd2d197327931b1cad54ebb3c324a317c1f31",
+  "data": {
+    "settings": {
+      "awakeStart": "08:00",
+      "awakeEnd": "22:00",
+      "blockOrder": [
+        "next_time",
+        "family",
+        "interests",
+        "about"
+      ]
+    },
+    "groups": [
+      {
+        "id": "g-001",
+        "name": "Friends",
+        "defaultIntervalDays": 30,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "people": [
+      {
+        "id": "p-fb",
+        "displayName": "Fb Friend",
+        "groupId": "g-001",
+        "timezone": "Europe/Lisbon",
+        "contactMethod": {
+          "type": "facebook",
+          "value": "fb.friend"
+        },
+        "facebook": "fb.friend",
+        "instagram": "fb.friend.ig",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "chats": [],
+    "lines": [],
+    "familyMembers": [],
+    "importantDates": [],
+    "customBlocks": []
+  }
+}

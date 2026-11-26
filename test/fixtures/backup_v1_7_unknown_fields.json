@@ -1,0 +1,71 @@
+{
+  "format": "lately-backup",
+  "formatVersion": "1.7",
+  "appVersion": "0.3.0",
+  "exportedAt": "2026-11-08T07:15:00Z",
+  "checksum": "sha256:76e14f96ada4ead79a0c28de1f2da9b02b6746fe80191375f9b03d0fa7f727bb",
+  "data": {
+    "settings": {
+      "awakeStart": "08:00",
+      "awakeEnd": "22:00",
+      "blockOrder": [
+        "next_time",
+        "family",
+        "interests",
+        "about"
+      ],
+      "futureSetting": {
+        "a": 1
+      }
+    },
+    "gifts": [
+      {
+        "id": "x-1",
+        "idea": "Tea"
+      }
+    ],
+    "groups": [
+      {
+        "id": "g-001",
+        "name": "Friends",
+        "defaultIntervalDays": 30,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z",
+        "icon": "star"
+      }
+    ],
+    "people": [
+      {
+        "id": "p-001",
+        "displayName": "Sam",
+        "groupId": "g-001",
+        "timezone": "Europe/Lisbon",
+        "contactMethod": {
+          "type": "text",
+          "value": "+351000000000",
+          "verified": true
+        },
+        "pronouns": "they/them",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "chats": [
+      {
+        "id": "c-001",
+        "personId": "p-001",
+        "occurredAt": "2026-10-30T18:00:00Z",
+        "type": "video",
+        "length": "catchup",
+        "depth": "varied",
+        "mood": "bright",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "lines": [],
+    "familyMembers": [],
+    "importantDates": [],
+    "customBlocks": []
+  }
+}

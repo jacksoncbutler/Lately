@@ -1,0 +1,34 @@
+# Lately: build instructions
+
+Lately is a personal, offline, device-only mobile app that ranks who to talk to next and stores a short profile and chat log per person. Owner: Jackson (programmer). Android APK first (GitHub Actions), iPhone later. Planned stack: Flutter, Drift (SQLite), Riverpod.
+
+## Read first, in this order
+1. `docs/product-spec.md`: what the app does and every settled decision.
+2. `docs/technical-plan.md`: stack, data model, backup format, formulas, build order, interaction rules.
+3. `docs/screens/`: how each screen looks.
+4. `reference/`: `logic.js` + `test.js` (ranking rules, ported first, keep the tests), `prototype/lately-prototype.html` (open in a browser; behaviour of record for anything the docs leave open). Run the logic tests with `node test.js` inside `reference/` (prints "all passed").
+
+## Status
+All nine build steps are done (0.12.0). Android is first; iPhone is a separate later step (see `docs/RELEASING.md`). New work is feature requests and polish, each still ending in something to install and check on the Pixel.
+
+## Working method
+- Follow the nine steps in "Build order" in the technical plan, one at a time. Each step ends with something Jackson can install on his Pixel 7a (GrapheneOS) and check. Do not start the next step before that.
+- Keep data and logic layers free of UI code. Port `reference/logic.js` to Dart as pure functions with the same tests; all tunable numbers live in one constants file (dueFloor 0.6, chipPenalty 0.6, gapBoost 2, gapRatio 4, trustChats 5, historyDamp 0.6, expCap 90, chip15Max 20, chip30Min 20, chipLongMin 50).
+- If the docs and prototype disagree, the prototype wins on behaviour, the technical plan on data and formats; tell Jackson about the mismatch.
+
+## Never break
+- Backup compatibility: format `lately-backup`; never remove or rename a required field; old files must always import (see "Backup format" rules). Every release gets a migration test with a sample file per format version.
+- Privacy: data stays on the device. No INTERNET permission, no analytics, cloud auto-backup off. Contacts permission only when a bulk add starts. Call-log reading is a Later item, optional, Android only.
+- Same release keystore for every build, or installs cannot update and data is lost.
+- Tone: no notifications, no red badges, no overdue counters, no streaks. Home shows exactly one person.
+- Interaction rules (technical plan, "Interaction rules") are identical on every screen: tap a line to edit, swipe left to delete with an Undo bar (no confirm), swipe right does nothing, trash icon while editing, Next time checkbox ticks without opening the editor. Delete forever exists only for archived people and needs confirmation.
+- Other-day logs are date-only: store 12:00 local, mark approximate, never in the future. No time-of-day choice.
+
+## Open questions (ask Jackson, do not guess)
+- None blocking. Settled Nov 2026: skip returns the next day, or sooner once every other eligible person has been contacted that day; in-person contact counts the same as any other; important dates (life events such as "their documentary release") come after version 1; the name "Lately" and the orbit icon are temporary, so keep name, icon and package id in one place; iOS comes later, so keep platform code (contacts, file picking, share sheet) behind small interfaces; group priority weights stay 1.0 and tune after real use; no export reminder in version 1.
+
+## Backup is a first-class feature
+A minimal Settings screen with Export backup and Import backup ships in step 3 (reachable from the Home icon), not step 8. Before any database migration the app snapshots the current data and restores it if the migration fails. Replace-import asks for confirmation and snapshots first.
+
+## Done means
+Analyzer clean, tests green (including backup import fixtures), APK installs over the previous build without losing data.

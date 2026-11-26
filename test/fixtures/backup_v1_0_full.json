@@ -1,0 +1,165 @@
+{
+  "format": "lately-backup",
+  "formatVersion": "1.0",
+  "appVersion": "0.3.0",
+  "exportedAt": "2026-11-08T07:15:00Z",
+  "checksum": "sha256:f40169db63da916b859b9672447e73efb08f377ee2e26de61c6afc50e80e9cdd",
+  "data": {
+    "settings": {
+      "awakeStart": "08:00",
+      "awakeEnd": "22:00",
+      "blockOrder": [
+        "next_time",
+        "family",
+        "interests",
+        "about"
+      ],
+      "id": "settings",
+      "createdAt": "2026-11-08T05:00:00Z",
+      "updatedAt": "2026-11-02T10:00:00Z",
+      "skipPolicy": "midnight",
+      "theme": "light"
+    },
+    "groups": [
+      {
+        "id": "g-parents",
+        "name": "Parents",
+        "defaultIntervalDays": 14,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      },
+      {
+        "id": "g-friends",
+        "name": "Friends",
+        "defaultIntervalDays": 30,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "people": [
+      {
+        "id": "p-ruth",
+        "displayName": "Ruth",
+        "fullName": "Ruth Anne Cole",
+        "middleName": "Anne",
+        "groupId": "g-friends",
+        "timezone": "Pacific/Auckland",
+        "timezoneConfirmed": true,
+        "contactMethod": {
+          "type": "text",
+          "value": "+64 555 0199"
+        },
+        "phone": "+64 555 0199",
+        "socials": [
+          "@ruth"
+        ],
+        "hometown": "Wellington",
+        "birthday": "1990-09-27",
+        "intervalOverrideDays": 21,
+        "lastTalkedEstimate": "2026-08-01T00:00:00Z",
+        "snoozedUntil": "2026-11-15T00:00:00Z",
+        "skippedUntil": "2026-11-09T11:00:00Z",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-02T10:00:00Z"
+      },
+      {
+        "id": "p-old",
+        "displayName": "Archived Al",
+        "groupId": "g-friends",
+        "timezone": "UTC",
+        "contactMethod": {
+          "type": "call"
+        },
+        "archivedAt": "2026-10-01T00:00:00Z",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-10-01T00:00:00Z"
+      }
+    ],
+    "customBlocks": [
+      {
+        "id": "b-gifts",
+        "key": "gifts",
+        "name": "Gift ideas",
+        "sortOrder": 1,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "familyMembers": [
+      {
+        "id": "f-dana",
+        "personId": "p-ruth",
+        "name": "Dana",
+        "relation": "partner",
+        "birthday": "--10-03",
+        "addedInChatId": "c-1",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "chats": [
+      {
+        "id": "c-1",
+        "personId": "p-ruth",
+        "occurredAt": "2026-10-25T12:00:00Z",
+        "timeApproximate": true,
+        "type": "person",
+        "depth": "deep",
+        "length": "long",
+        "durationMinutes": 60,
+        "feelings": [
+          "happy",
+          "tired"
+        ],
+        "note": "Visited in Wellington",
+        "source": "manual",
+        "createdAt": "2026-10-26T08:00:00Z",
+        "updatedAt": "2026-10-26T08:00:00Z"
+      }
+    ],
+    "lines": [
+      {
+        "id": "l-1",
+        "personId": "p-ruth",
+        "block": "next_time",
+        "text": "Ask about the garden",
+        "done": true,
+        "doneAt": "2026-10-25T12:30:00Z",
+        "chatId": "c-1",
+        "sortOrder": 1,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-10-25T12:30:00Z"
+      },
+      {
+        "id": "l-2",
+        "personId": "p-ruth",
+        "block": "family",
+        "text": "Loves rock climbing",
+        "relationshipId": "f-dana",
+        "addedInChatId": "c-1",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      },
+      {
+        "id": "l-deleted",
+        "personId": "p-ruth",
+        "block": "about",
+        "text": "Removed line",
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-10-30T00:00:00Z",
+        "deletedAt": "2026-10-30T00:00:00Z"
+      }
+    ],
+    "importantDates": [
+      {
+        "id": "d-1",
+        "personId": "p-ruth",
+        "label": "Documentary release",
+        "date": "2027-03-01",
+        "repeatsYearly": false,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ]
+  }
+}

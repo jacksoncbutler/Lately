@@ -1,0 +1,69 @@
+{
+  "format": "lately-backup",
+  "formatVersion": "1.0",
+  "appVersion": "0.3.0",
+  "exportedAt": "2026-11-08T07:15:00Z",
+  "checksum": "sha256:fbfc45eb9255088bfafedaae106cbdac4067aae0a0cb9236e3bc39caf5a71b90",
+  "data": {
+    "settings": {
+      "awakeStart": "08:00",
+      "awakeEnd": "22:00",
+      "blockOrder": [
+        "next_time",
+        "family",
+        "interests",
+        "about"
+      ]
+    },
+    "groups": [
+      {
+        "id": "g-001",
+        "name": "Friends",
+        "defaultIntervalDays": 30,
+        "createdAt": "2026-11-08T05:00:00Z",
+        "updatedAt": "2026-11-08T05:00:00Z"
+      }
+    ],
+    "people": [
+      {
+        "id": "p-001",
+        "displayName": "Sam",
+        "groupId": "g-001",
+        "timezone": "Europe/Lisbon",
+        "contactMethod": {
+          "type": "text",
+          "value": "+351000000000"
+        },
+        "birthday": "--03-14",
+        "createdAt": "2026-11-08T05:10:00Z",
+        "updatedAt": "2026-11-08T05:10:00Z"
+      }
+    ],
+    "chats": [
+      {
+        "id": "c-001",
+        "personId": "p-001",
+        "occurredAt": "2026-10-30T18:00:00Z",
+        "type": "call",
+        "length": "catchup",
+        "depth": "varied",
+        "createdAt": "2026-10-30T18:40:00Z",
+        "updatedAt": "2026-10-30T18:40:00Z"
+      }
+    ],
+    "lines": [
+      {
+        "id": "l-001",
+        "personId": "p-001",
+        "block": "next_time",
+        "text": "Ask about the new job",
+        "done": false,
+        "createdAt": "2026-11-01T09:00:00Z",
+        "updatedAt": "2026-11-01T09:00:00Z"
+      }
+    ],
+    "familyMembers": [],
+    "importantDates": [],
+    "customBlocks": []
+  }
+}
